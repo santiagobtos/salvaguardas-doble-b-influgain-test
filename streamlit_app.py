@@ -551,17 +551,26 @@ with tab_b:
             key="crm_editor",
         )
 
+        forzar_webhook_caido = st.checkbox(
+            "Simular caída del webhook del CRM al aplicar (se reintenta solo 2 veces antes de ir a la cola de fallos)",
+        )
         if st.button("Aplicar disposiciones seleccionadas", type="primary"):
             pendientes = edited[edited["Disposición a aplicar"] != ""]
             if pendientes.empty:
                 st.info("No seleccionaste ninguna disposición en la tabla.")
             else:
                 for _, row in pendientes.iterrows():
-                    r = crm_automation.aplicar_disposicion(row["ID"], row["Disposición a aplicar"])
+                    r = crm_automation.aplicar_disposicion(
+                        row["ID"], row["Disposición a aplicar"], forzar_fallo_webhook=forzar_webhook_caido,
+                    )
                     if r["status"] == "ok":
-                        st.success(f"{row['ID']}: → **{r['stage']}**. Borrador de WhatsApp generado.")
+                        intentos = r.get("intentos_webhook", 1)
+                        nota_intentos = f" (tras {intentos} intentos al webhook)" if intentos > 1 else ""
+                        st.success(f"{row['ID']}: → **{r['stage']}**. Borrador de WhatsApp generado{nota_intentos}.")
                     elif r["status"] == "escalado":
                         st.warning(f"{row['ID']}: no se pudo aplicar ({r['motivo']}) → se escaló a revisión humana.")
+                    elif r.get("motivo") == "webhook_caido":
+                        st.error(f"{row['ID']}: el webhook del CRM no respondió tras {r.get('intentos_webhook')} intentos automáticos → enviado a la cola de fallos.")
                     else:
                         st.error(f"{row['ID']}: error ({r.get('motivo')}) → enviado a la cola de fallos.")
                 st.rerun()
@@ -590,15 +599,13 @@ with tab_b:
 
     st.markdown("---")
     st.subheader("Manejo de errores simulado")
-    st.caption("Teléfono faltante, lead inexistente, disposición inválida o un webhook caído — nada se pierde en silencio.")
+    st.caption(
+        "Teléfono faltante, lead inexistente, disposición inválida o un webhook caído — nada se pierde en "
+        "silencio. El webhook caído se simula con el checkbox de arriba (al aplicar una disposición real); "
+        "estos dos botones cubren los otros dos casos."
+    )
 
-    e1, e2, e3 = st.columns(3)
-    if e1.button("Simular webhook caído"):
-        crm_automation.simular_fallo_webhook(
-            {"origen": "CRM externo", "intento": datetime.now(timezone.utc).isoformat()},
-            "Timeout simulado: el webhook del CRM externo no respondió.",
-        )
-        st.rerun()
+    e2, e3 = st.columns(2)
     if e2.button("Simular transferencia sin teléfono"):
         db.upsert_lead("SIM-NOPHONE", datetime.now(timezone.utc).isoformat(), "@demo", "CTWA", "lead de prueba sin teléfono", None, "responder")
         r = crm_automation.aplicar_disposicion("SIM-NOPHONE", "Transferido")
@@ -609,10 +616,13 @@ with tab_b:
         st.error(f"Resultado: {r}")
         st.rerun()
 
-    st.markdown("#### Cola de fallos")
+    st.markdown("#### Cola de fallos (dead-letter queue)")
     fallos = db.listar_fallos_pendientes()
-    if st.button("Reintentar pendientes"):
-        crm_automation.reintentar_fallos()
+    if st.button("Reintentar manualmente"):
+        resultados = crm_automation.reintentar_fallos()
+        resueltos = [r for r in resultados if r["status"] == "resuelto"]
+        if resueltos:
+            st.success(f"{len(resueltos)} fallo(s) resueltos al reintentar: {', '.join(r['lead_id'] for r in resueltos)}.")
         st.rerun()
     if fallos:
         st.dataframe(pd.DataFrame(fallos)[["tipo", "error", "retry_count", "status"]], use_container_width=True, hide_index=True)

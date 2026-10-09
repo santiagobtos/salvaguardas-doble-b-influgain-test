@@ -3,20 +3,27 @@
 Disposiciones soportadas: No Answer | Info Sent | Transferido | Call Back |
 No le interesa. Cada una mueve la etapa del lead, genera un borrador de
 WhatsApp compliant, y deja audit trail. Los errores van a una cola de
-fallos con reintento, nunca se pierden en silencio.
+fallos (dead-letter queue) con reintento, nunca se pierden en silencio.
 """
+import json
 import random
 from datetime import datetime, timezone
 
 from src import db
 
 STAGE_MAP = {
-    "No Answer": "Sin Respuesta",
-    "Info Sent": "Info Enviada",
-    "Transferido": "Transferido a Consejero",
-    "Call Back": "Reintentar Contacto",
-    "No le interesa": "Cerrado - Sin Interés",
+    "No Answer": "Reintento",
+    "Info Sent": "Información Enviada",
+    "Transferido": "Transferido al Partner",
+    "Call Back": "Agendado",
+    "No le interesa": "Descartado",
 }
+
+
+class WebhookCRMError(Exception):
+    """Simula una falla de red/API al notificar al CRM externo del partner
+    (timeout, 5xx, etc.) — no es un error real, es para poder probar la
+    resiliencia del sistema a demanda desde la interfaz."""
 
 _TIPO_DEUDA_FRASES = {
     "tarjeta_credito": "tu tarjeta de crédito",
@@ -68,7 +75,32 @@ def _now():
     return datetime.now(timezone.utc).isoformat()
 
 
-def aplicar_disposicion(lead_id, disposicion, actor="sistema"):
+def _notificar_webhook_crm(lead_id, disposicion, forzar_fallo=False):
+    """Simula la llamada HTTP al CRM del partner que registra la disposición.
+    Con forzar_fallo=True se comporta como un timeout/5xx real, para poder
+    probar la resiliencia del sistema a demanda desde la interfaz."""
+    if forzar_fallo:
+        raise WebhookCRMError(f"Timeout simulado notificando '{disposicion}' para {lead_id}")
+    return True
+
+
+def _notificar_con_reintentos(lead_id, disposicion, forzar_fallo=False, max_reintentos=2):
+    """Reintentos automáticos (in-process) ante una falla del webhook, antes
+    de darse por vencido y desviar a la cola de fallos. Devuelve
+    (ok, intentos_totales, ultimo_error)."""
+    intentos = 0
+    ultimo_error = None
+    while intentos <= max_reintentos:
+        intentos += 1
+        try:
+            _notificar_webhook_crm(lead_id, disposicion, forzar_fallo=forzar_fallo)
+            return True, intentos, None
+        except WebhookCRMError as e:
+            ultimo_error = str(e)
+    return False, intentos, ultimo_error
+
+
+def aplicar_disposicion(lead_id, disposicion, actor="sistema", forzar_fallo_webhook=False):
     timestamp = _now()
 
     if disposicion not in STAGE_MAP:
@@ -98,6 +130,16 @@ def aplicar_disposicion(lead_id, disposicion, actor="sistema"):
         db.log_decision(timestamp, lead_id, "escalar_humano", "Transferencia sin teléfono válido", None)
         return {"status": "escalado", "motivo": "telefono_faltante"}
 
+    ok, intentos, ultimo_error = _notificar_con_reintentos(lead_id, disposicion, forzar_fallo=forzar_fallo_webhook)
+    if not ok:
+        db.encolar_fallo(
+            timestamp,
+            "webhook_caido",
+            {"lead_id": lead_id, "disposicion": disposicion, "actor": actor, "intentos": intentos},
+            f"Webhook del CRM externo no respondió tras {intentos} intentos automáticos: {ultimo_error}",
+        )
+        return {"status": "error", "motivo": "webhook_caido", "intentos_webhook": intentos}
+
     estado_anterior = lead["stage"]
     nuevo_stage = STAGE_MAP[disposicion]
     db.actualizar_stage(lead_id, nuevo_stage)
@@ -107,25 +149,36 @@ def aplicar_disposicion(lead_id, disposicion, actor="sistema"):
 
     db.registrar_audit(
         timestamp, lead_id, actor, f"disposicion:{disposicion}",
-        estado_anterior, nuevo_stage, f"draft_id={draft_id}",
+        estado_anterior, nuevo_stage, f"draft_id={draft_id}, intentos_webhook={intentos}",
     )
 
-    return {"status": "ok", "stage": nuevo_stage, "draft_id": draft_id}
-
-
-def simular_fallo_webhook(payload, error_msg="Webhook caído (simulado)"):
-    """Para la demo: simula que el webhook del CRM externo no respondió."""
-    db.encolar_fallo(_now(), "webhook_caido", payload, error_msg)
+    return {"status": "ok", "stage": nuevo_stage, "draft_id": draft_id, "intentos_webhook": intentos}
 
 
 def reintentar_fallos(max_retries=3):
-    """Reintenta los fallos pendientes. Tras max_retries pasan a fallido_permanente."""
+    """Reintento manual desde la cola de fallos (botón 'Reintentar
+    manualmente'). Para 'webhook_caido' vuelve a intentar la disposición
+    original de verdad (ya no forzando el fallo, simulando que el CRM
+    volvió a responder); para los demás tipos, que no tienen una acción de
+    reintento sensata (ej. una disposición inválida sigue siendo inválida),
+    solo se cuenta el intento. Tras max_retries sin éxito, se marca
+    fallido_permanente."""
     resultados = []
     for fallo in db.listar_fallos_pendientes():
         if fallo["retry_count"] >= max_retries:
             db.marcar_fallo_estado(fallo["id"], "fallido_permanente")
             resultados.append({"id": fallo["id"], "status": "fallido_permanente"})
             continue
+
         db.incrementar_retry(fallo["id"])
+        payload = json.loads(fallo["payload_json"]) if fallo["payload_json"] else {}
+
+        if fallo["tipo"] == "webhook_caido" and payload.get("lead_id") and payload.get("disposicion"):
+            r = aplicar_disposicion(payload["lead_id"], payload["disposicion"], actor="reintento_manual")
+            if r.get("status") == "ok":
+                db.marcar_fallo_estado(fallo["id"], "resuelto")
+                resultados.append({"id": fallo["id"], "status": "resuelto", "lead_id": payload["lead_id"]})
+                continue
+
         resultados.append({"id": fallo["id"], "status": "reintentado"})
     return resultados
