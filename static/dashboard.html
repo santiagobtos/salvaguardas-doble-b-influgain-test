@@ -2,165 +2,379 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Salvaguardas Doble B — Panel de Operación</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,420;0,9..144,560;0,9..144,650;1,9..144,500&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
   :root {
-    --bg: #0f1420;
-    --panel: #161d2e;
-    --panel-2: #1d2740;
-    --border: #2a3350;
-    --text: #e8ecf5;
-    --muted: #9aa5c0;
-    --accent: #5b8cff;
-    --green: #35c48f;
-    --orange: #f0a93a;
-    --red: #f2555a;
-    --gray: #6b7593;
+    --bg: #f6f2ea;
+    --paper: #fffdf9;
+    --border: #e6ddc9;
+    --ink: #2b2620;
+    --ink-soft: #554f44;
+    --ink-muted: #8a8272;
+
+    --brand: #2f5d50;
+    --brand-dark: #1f453b;
+    --brand-tint: #e5ede8;
+    --brand-tint-strong: #cfe0d7;
+
+    --clay: #b2553a;
+    --clay-tint: #f4e3da;
+
+    --gold: #a9802f;
+    --gold-tint: #f3ead1;
+
+    --neutral-tint: #ece8df;
+
+    --radius: 14px;
+    --serif: 'Fraunces', Georgia, 'Times New Roman', serif;
+    --sans: 'Inter', -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
   }
+
   * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
   body {
     margin: 0;
-    font-family: -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+    font-family: var(--sans);
     background: var(--bg);
-    color: var(--text);
-    padding: 24px;
+    color: var(--ink);
+    line-height: 1.5;
   }
-  header { margin-bottom: 24px; }
-  header h1 { margin: 0 0 4px; font-size: 22px; }
-  header p { margin: 0; color: var(--muted); font-size: 14px; }
 
-  .toolbar { display: flex; gap: 10px; margin: 16px 0 24px; flex-wrap: wrap; }
+  .layout { display: flex; min-height: 100vh; }
+
+  /* ---------- Sidebar ---------- */
+  .sidebar {
+    width: 240px; flex-shrink: 0; background: var(--paper);
+    border-right: 1px solid var(--border); padding: 28px 20px;
+    position: sticky; top: 0; height: 100vh; display: flex; flex-direction: column;
+  }
+  .brand { display: flex; align-items: center; gap: 10px; margin-bottom: 30px; }
+  .brand .mark {
+    width: 36px; height: 36px; border-radius: 10px; background: var(--brand);
+    color: #fff; display: flex; align-items: center; justify-content: center;
+    font-family: var(--serif); font-weight: 650; font-size: 16px; flex-shrink: 0;
+  }
+  .brand .name { font-size: 13.5px; font-weight: 600; line-height: 1.25; }
+  .brand .name small { display: block; color: var(--ink-muted); font-weight: 400; font-size: 11.5px; }
+
+  nav.sidenav { display: flex; flex-direction: column; gap: 2px; margin-bottom: auto; }
+  nav.sidenav a {
+    color: var(--ink-soft); text-decoration: none; font-size: 13.5px; padding: 9px 10px;
+    border-radius: 8px; font-weight: 500;
+  }
+  nav.sidenav a:hover { background: var(--brand-tint); color: var(--brand-dark); }
+  nav.sidenav .tag { color: var(--ink-muted); font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase; margin: 16px 10px 4px; }
+
+  .side-actions { display: flex; flex-direction: column; gap: 8px; padding-top: 18px; border-top: 1px solid var(--border); }
+
   button {
-    background: var(--accent); color: white; border: none; border-radius: 8px;
-    padding: 9px 16px; font-size: 14px; cursor: pointer; font-weight: 600;
+    font-family: var(--sans); border: none; border-radius: 9px; cursor: pointer;
+    font-size: 13.5px; font-weight: 600; padding: 10px 14px;
   }
-  button.secondary { background: var(--panel-2); color: var(--text); border: 1px solid var(--border); }
-  button.small { padding: 5px 10px; font-size: 12px; }
-  button:hover { opacity: 0.9; }
+  button.primary { background: var(--brand); color: #fff; }
+  button.primary:hover { background: var(--brand-dark); }
+  button.ghost { background: transparent; color: var(--ink-soft); border: 1px solid var(--border); }
+  button.ghost:hover { border-color: var(--brand); color: var(--brand-dark); }
+  button.tiny { padding: 6px 10px; font-size: 12px; }
 
-  section {
-    background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
-    padding: 18px; margin-bottom: 20px;
+  /* ---------- Main ---------- */
+  main { flex: 1; max-width: 880px; margin: 0 auto; padding: 56px 32px 100px; }
+  section { margin-bottom: 86px; scroll-margin-top: 30px; }
+  section:last-of-type { margin-bottom: 40px; }
+
+  .eyebrow {
+    font-size: 11.5px; letter-spacing: .08em; text-transform: uppercase;
+    color: var(--brand); font-weight: 700; margin-bottom: 10px; display: block;
   }
-  section h2 { margin: 0 0 4px; font-size: 16px; }
-  section .subtitle { color: var(--muted); font-size: 12px; margin: 0 0 14px; }
+  h1 { font-family: var(--serif); font-size: 38px; font-weight: 650; line-height: 1.15; margin: 0 0 18px; letter-spacing: -.01em; }
+  h2 { font-family: var(--serif); font-size: 28px; font-weight: 600; line-height: 1.2; margin: 0 0 14px; letter-spacing: -.01em; }
+  h3 { font-family: var(--serif); font-size: 16px; font-weight: 600; margin: 0 0 8px; }
+  p.lede { font-size: 16px; color: var(--ink-soft); max-width: 62ch; margin: 0 0 8px; }
+  p.lede + p.lede { margin-top: 10px; }
 
-  .grid-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
-  .stat-card { background: var(--panel-2); border: 1px solid var(--border); border-radius: 10px; padding: 12px; }
-  .stat-card .value { font-size: 24px; font-weight: 700; }
-  .stat-card .label { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .hero-stats { display: flex; gap: 28px; margin-top: 28px; padding-top: 24px; border-top: 1px solid var(--border); }
+  .hero-stats .num { font-family: var(--serif); font-size: 30px; font-weight: 600; color: var(--brand-dark); }
+  .hero-stats .lbl { font-size: 12px; color: var(--ink-muted); margin-top: 2px; }
+  .hero-note { margin-top: 22px; font-size: 12.5px; color: var(--ink-muted); border-left: 2px solid var(--border); padding-left: 12px; }
 
-  form.lead-form { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 10px; }
-  form.lead-form input, form.lead-form select {
-    background: var(--panel-2); border: 1px solid var(--border); color: var(--text);
-    border-radius: 6px; padding: 8px; font-size: 13px;
+  /* three-path explainer */
+  .paths { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin: 26px 0 34px; }
+  .path-card { background: var(--paper); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; }
+  .path-card .dot { width: 9px; height: 9px; border-radius: 50%; margin-bottom: 10px; }
+  .path-card.responder .dot { background: var(--brand); }
+  .path-card.escalar .dot { background: var(--clay); }
+  .path-card.ignorar .dot { background: var(--ink-muted); }
+  .path-card h3 { font-size: 14.5px; }
+  .path-card p { font-size: 12.8px; color: var(--ink-soft); margin: 0; }
+
+  /* phone / chat simulator */
+  .simulator {
+    background: var(--paper); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 22px; display: grid; grid-template-columns: 1fr 1fr; gap: 24px;
   }
-  form.lead-form .full { grid-column: 1 / -1; }
+  @media (max-width: 760px) { .simulator { grid-template-columns: 1fr; } }
+  .sim-col h3 { font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--ink-muted); font-family: var(--sans); font-weight: 600; margin-bottom: 12px; }
 
-  .log { max-height: 160px; overflow-y: auto; font-size: 12px; font-family: Consolas, monospace; }
-  .log div { padding: 4px 0; border-bottom: 1px solid var(--border); }
-
-  .badge {
-    display: inline-block; font-size: 11px; font-weight: 700; padding: 2px 8px;
-    border-radius: 999px; text-transform: uppercase;
+  .chat-input-row { display: flex; flex-direction: column; gap: 8px; }
+  .chat-input-row input, .chat-input-row select, .chat-input-row textarea {
+    font-family: var(--sans); background: var(--bg); border: 1px solid var(--border); color: var(--ink);
+    border-radius: 9px; padding: 9px 11px; font-size: 13px; width: 100%;
   }
-  .badge.responder { background: rgba(53,196,143,.15); color: var(--green); }
-  .badge.escalar_humano { background: rgba(242,85,90,.15); color: var(--red); }
-  .badge.ignorar { background: rgba(107,117,147,.2); color: var(--gray); }
-
-  .kanban { display: grid; grid-template-columns: repeat(6, minmax(190px, 1fr)); gap: 10px; overflow-x: auto; }
-  .kanban-col { background: var(--panel-2); border: 1px solid var(--border); border-radius: 10px; padding: 8px; min-height: 80px; }
-  .kanban-col h3 { font-size: 11px; color: var(--muted); margin: 2px 4px 8px; text-transform: uppercase; }
-  .lead-card {
-    background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
-    padding: 8px; margin-bottom: 8px; font-size: 12px;
+  .chat-input-row .row2 { display: flex; gap: 8px; }
+  .chat-input-row .row2 > * { flex: 1; }
+  .bubble-in {
+    background: var(--bg); border: 1px solid var(--border); border-radius: 12px 12px 12px 3px;
+    padding: 10px 13px; font-size: 13px; margin-top: 10px; max-width: 90%;
   }
-  .lead-card .lid { font-weight: 700; }
-  .lead-card .meta { color: var(--muted); font-size: 11px; margin: 2px 0 6px; }
-  .lead-card select { width: 100%; font-size: 11px; margin-top: 4px; background: var(--panel-2); color: var(--text); border: 1px solid var(--border); border-radius: 6px; }
 
-  table { width: 100%; border-collapse: collapse; font-size: 13px; }
-  table th, table td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border); }
-  table th { color: var(--muted); font-size: 11px; text-transform: uppercase; }
+  .timeline { display: flex; flex-direction: column; gap: 12px; max-height: 420px; overflow-y: auto; padding-right: 4px; }
+  .tl-item { border-left: 2px solid var(--border); padding-left: 12px; position: relative; }
+  .tl-item::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--ink-muted); position: absolute; left: -4.5px; top: 5px; }
+  .tl-item.responder::before { background: var(--brand); }
+  .tl-item.escalar_humano::before { background: var(--clay); }
+  .tl-item .tl-time { font-size: 10.5px; color: var(--ink-muted); }
+  .tl-item .tl-head { font-size: 12.8px; font-weight: 600; margin: 1px 0 2px; }
+  .tl-item .tl-reason { font-size: 12px; color: var(--ink-soft); }
+  .tl-item .draft-bubble {
+    margin-top: 7px; background: var(--brand-tint); border: 1px solid var(--brand-tint-strong);
+    border-radius: 10px 10px 10px 3px; padding: 8px 11px; font-size: 12px; color: var(--brand-dark);
+  }
+  .tl-item .draft-bubble .stamp { font-size: 9.5px; text-transform: uppercase; letter-spacing: .04em; opacity: .75; display: block; margin-bottom: 3px; }
+  .tl-empty { color: var(--ink-muted); font-size: 12.5px; }
 
-  .content-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
-  .content-card { background: var(--panel-2); border: 1px solid var(--border); border-radius: 10px; padding: 12px; font-size: 12px; white-space: pre-wrap; }
-  .content-card .score { color: var(--accent); font-weight: 700; font-size: 11px; margin-bottom: 6px; }
+  /* kanban */
+  .kanban { display: grid; grid-auto-flow: column; grid-auto-columns: 210px; gap: 12px; overflow-x: auto; padding-bottom: 6px; margin-top: 22px; }
+  .kcol { border-radius: var(--radius); padding: 12px; border: 1px solid var(--border); }
+  .kcol h4 { font-family: var(--sans); font-size: 11.5px; text-transform: uppercase; letter-spacing: .04em; margin: 0 0 10px; opacity: .85; }
+  .kcard {
+    background: var(--paper); border: 1px solid var(--border); border-radius: 10px; padding: 10px;
+    margin-bottom: 9px; font-size: 12.3px;
+  }
+  .kcard .lid { font-weight: 700; font-family: var(--serif); font-size: 13.5px; }
+  .kcard .tag { display: inline-block; font-size: 9.5px; font-weight: 700; text-transform: uppercase; padding: 1px 7px; border-radius: 999px; margin-left: 6px; vertical-align: middle; }
+  .kcard .tag.responder { background: var(--brand-tint); color: var(--brand-dark); }
+  .kcard .tag.escalar_humano { background: var(--clay-tint); color: var(--clay); }
+  .kcard .tag.ignorar { background: var(--neutral-tint); color: var(--ink-muted); }
+  .kcard .meta { color: var(--ink-muted); font-size: 11px; margin: 2px 0 6px; }
+  .kcard .msg { color: var(--ink-soft); margin-bottom: 7px; }
+  .kcard select {
+    width: 100%; font-size: 11px; padding: 5px 6px; border-radius: 6px; border: 1px solid var(--border);
+    background: var(--bg); color: var(--ink); font-family: var(--sans);
+  }
+
+  .subsection { margin-top: 40px; padding-top: 28px; border-top: 1px solid var(--border); }
+
+  table.clean { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 14px; }
+  table.clean th { text-align: left; font-size: 10.5px; text-transform: uppercase; letter-spacing: .04em; color: var(--ink-muted); padding: 6px 10px; border-bottom: 1px solid var(--border); font-weight: 600; }
+  table.clean td { padding: 9px 10px; border-bottom: 1px solid var(--border); color: var(--ink-soft); }
+  table.clean tr:last-child td { border-bottom: none; }
+
+  /* funnel bars */
+  .funnel { margin-top: 24px; display: flex; flex-direction: column; gap: 10px; }
+  .funnel-row { display: grid; grid-template-columns: 150px 1fr 70px; align-items: center; gap: 12px; }
+  .funnel-row .flabel { font-size: 12.8px; color: var(--ink-soft); font-weight: 500; }
+  .funnel-track { background: var(--neutral-tint); border-radius: 999px; height: 20px; overflow: hidden; }
+  .funnel-fill { background: var(--brand); height: 100%; border-radius: 999px; transition: width .6s ease; }
+  .funnel-row .fval { font-size: 12.8px; color: var(--ink-muted); text-align: right; font-variant-numeric: tabular-nums; }
+
+  .callout {
+    margin-top: 20px; background: var(--gold-tint); border: 1px solid #e6d3a3; border-left: 3px solid var(--gold);
+    border-radius: 10px; padding: 16px 18px; font-size: 13.3px; color: #5c4620;
+  }
+  .callout strong { color: #4a3815; }
+  .callout .figures { margin-top: 8px; font-size: 12px; color: #7a6334; }
+
+  /* content scripts */
+  .scripts { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; margin-top: 22px; }
+  .script-card {
+    background: var(--paper); border: 1px solid var(--border); border-radius: var(--radius);
+    overflow: hidden;
+  }
+  .script-card .strip { background: var(--brand-tint); color: var(--brand-dark); font-size: 11px; font-weight: 700; padding: 8px 14px; display: flex; justify-content: space-between; }
+  .script-card .body { padding: 14px; font-size: 12.8px; color: var(--ink-soft); white-space: pre-wrap; line-height: 1.55; }
+  .script-card .body b { color: var(--ink); }
+
+  footer.page-footer { font-size: 11.5px; color: var(--ink-muted); border-top: 1px solid var(--border); padding-top: 18px; }
+
+  @media (max-width: 860px) {
+    .layout { flex-direction: column; }
+    .sidebar { width: 100%; height: auto; position: relative; flex-direction: row; align-items: center; overflow-x: auto; padding: 14px 16px; }
+    .sidebar .brand { margin-bottom: 0; }
+    nav.sidenav { flex-direction: row; margin: 0 14px; }
+    nav.sidenav .tag { display: none; }
+    .side-actions { flex-direction: row; border-top: none; padding-top: 0; }
+    main { padding: 34px 18px 70px; }
+    .paths { grid-template-columns: 1fr; }
+  }
 </style>
 </head>
 <body>
 
-<header>
-  <h1>Salvaguardas Doble B × Consejería Clara</h1>
-  <p>Panel de operación — prueba técnica Influgain. Escenario 100% ficticio, datos inventados.</p>
-</header>
+<div class="layout">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="mark">SB</div>
+      <div class="name">Salvaguardas Doble B<small>× Consejería Clara</small></div>
+    </div>
+    <nav class="sidenav">
+      <a href="#resumen">Resumen</a>
+      <span class="tag">Ejercicios</span>
+      <a href="#ejercicio-a">A · Pre-calificación</a>
+      <a href="#ejercicio-b">B · CRM</a>
+      <a href="#ejercicio-c">C · Reporting</a>
+      <a href="#ejercicio-d">D · Contenido</a>
+    </nav>
+    <div class="side-actions">
+      <button class="primary" onclick="cargarDemo()">Cargar demo</button>
+      <button class="ghost" onclick="refrescarTodo()">Actualizar panel</button>
+    </div>
+  </aside>
 
-<div class="toolbar">
-  <button onclick="cargarDemo()">Cargar demo (resetea y siembra leads)</button>
-  <button class="secondary" onclick="refrescarTodo()">Actualizar panel</button>
+  <main>
+
+    <section id="resumen">
+      <span class="eyebrow">Prueba técnica · Influgain</span>
+      <h1>Un sistema que sigue trabajando aunque nadie esté mirando.</h1>
+      <p class="lede">Salvaguardas Doble B es una agencia ficticia que hace marketing de alivio de deudas a través de creadores. Los leads escriben por chat a cualquier hora; este panel muestra, paso a paso, qué decide el sistema solo y en qué momento exacto le pasa el control a un humano.</p>
+      <p class="lede">Todo lo que ves — la marca, los leads, las inscripciones del partner — es ficticio. No hay conexión con Influgain, Meta, WhatsApp Business ni ningún sistema real.</p>
+      <div class="hero-stats" id="hero-stats"></div>
+      <div class="hero-note">Las métricas de arriba vienen de <code>data/leads.csv</code> + <code>data/partner_enrollments.csv</code> (datos históricos fijos, con errores a propósito — Ejercicio C). La operación en vivo de abajo usa una base separada que puedes reiniciar con "Cargar demo".</div>
+    </section>
+
+    <section id="ejercicio-a">
+      <span class="eyebrow">Ejercicio A · 30% · Pre-calificación y handoff</span>
+      <h2>El primer mensaje nunca espera a que alguien se despierte.</h2>
+      <p class="lede">Un lead ve un reel de un creador y escribe a las 11:47pm. El equipo humano está dormido. En segundos, el sistema tiene que tomar uno de tres caminos — y dejar un rastro claro de por qué, para que quien lo revise mañana no tenga que adivinar.</p>
+
+      <div class="paths">
+        <div class="path-card responder">
+          <div class="dot"></div>
+          <h3>Responder</h3>
+          <p>El mensaje está dentro de las reglas estándar. El sistema pre-califica (monto, tipo de deuda, interés en un Consejero) y deja un <strong>borrador</strong> en cola humana. Nunca lo envía solo.</p>
+        </div>
+        <div class="path-card escalar">
+          <div class="dot"></div>
+          <h3>Escalar a humano</h3>
+          <p>Aparece una palabra de riesgo (demanda, embargo, amenaza) o el monto sale de rango. El sistema no improvisa: registra el motivo y lo deja esperando a una persona.</p>
+        </div>
+        <div class="path-card ignorar">
+          <div class="dot"></div>
+          <h3>Ignorar</h3>
+          <p>El lead pide salir de la lista o ya no le interesa. Se registra la decisión, pero no se le vuelve a escribir.</p>
+        </div>
+      </div>
+
+      <div class="simulator">
+        <div class="sim-col">
+          <h3>Simular un mensaje entrante</h3>
+          <form class="chat-input-row" onsubmit="enviarLead(event)">
+            <div class="row2">
+              <input id="f_lead_id" placeholder="lead_id (ej: L500)" required>
+              <input id="f_creador" placeholder="@creador" required>
+            </div>
+            <div class="row2">
+              <select id="f_canal"><option>CTWA</option><option>organico</option></select>
+              <input id="f_telefono" placeholder="teléfono (opcional)">
+            </div>
+            <textarea id="f_mensaje" rows="3" placeholder="Escribe el mensaje del lead, como si fuera un chat real..." required></textarea>
+            <button type="submit" class="primary">Enviar al agente</button>
+          </form>
+        </div>
+        <div class="sim-col">
+          <h3>Lo que decidió el sistema</h3>
+          <div class="timeline" id="timeline">
+            <div class="tl-empty">Aún no hay mensajes. Envía uno o carga la demo.</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="ejercicio-b">
+      <span class="eyebrow">Ejercicio B · 30% · Automatización de CRM</span>
+      <h2>Nadie se pierde en la fila, ni siquiera cuando algo falla.</h2>
+      <p class="lede">Cuando un humano llama o escribe a un lead y aplica una disposición, el sistema mueve la etapa, redacta el mensaje de WhatsApp correspondiente y deja constancia de todo. Si algo se rompe en el camino — un teléfono que no existe, un webhook caído — no desaparece: cae en una cola de fallos con reintento.</p>
+
+      <h3 style="font-family:var(--sans); font-size:13px; text-transform:uppercase; letter-spacing:.04em; color:var(--ink-muted); margin-top:28px;">Tablero por etapa</h3>
+      <div class="kanban" id="kanban"></div>
+
+      <div class="subsection">
+        <h3 style="font-size:19px; font-family:var(--serif);">Cuando algo falla</h3>
+        <p class="lede" style="font-size:13.5px;">Teléfono faltante, lead inexistente, disposición que no existe — cada error queda aquí, con su motivo, en vez de perderse en silencio.</p>
+        <div style="margin:10px 0 4px;"><button class="ghost tiny" onclick="reintentarFallos()">Reintentar pendientes</button></div>
+        <table class="clean" id="tabla-fallos">
+          <thead><tr><th>Tipo</th><th>Error</th><th>Reintentos</th><th>Estado</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="ejercicio-c">
+      <span class="eyebrow">Ejercicio C · 25% · Datos y reporting</span>
+      <h2>Los números no mienten, pero los datos sí engañan.</h2>
+      <p class="lede">Las inscripciones que manda el partner llegan con errores reales: teléfonos capturados mal, creadores sin asignar, fechas imposibles. Antes de confiar en cualquier métrica, hay que limpiar y dejar constancia de qué se cambió y por qué.</p>
+
+      <div class="funnel" id="funnel"></div>
+
+      <div class="subsection">
+        <h3 style="font-size:19px; font-family:var(--serif);">Leads estancados</h3>
+        <p class="lede" style="font-size:13.5px;">Llevan más días de los permitidos sin avanzar, y nadie los ha vuelto a tocar:</p>
+        <table class="clean" id="tabla-estancados">
+          <thead><tr><th>Lead</th><th>Creador</th><th>Canal</th><th>Estado inicial</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+
+      <div class="subsection">
+        <h3 style="font-size:19px; font-family:var(--serif);">Qué rompería el pago de comisiones</h3>
+        <div class="callout" id="callout-comisiones"></div>
+      </div>
+    </section>
+
+    <section id="ejercicio-d">
+      <span class="eyebrow">Ejercicio D · 15% · Sistema de contenido</span>
+      <h2>Guiones que nacen de preguntas reales, no de la nada.</h2>
+      <p class="lede">Cada guion está atado a una fuente concreta — una pregunta u objeción que leads de verdad repiten — y se prioriza por qué tan frecuente y urgente es, no por capricho.</p>
+      <div class="scripts" id="content-cards"></div>
+    </section>
+
+    <footer class="page-footer">
+      Escenario 100% ficticio para la prueba técnica de Influgain. Documentos complementarios en el repo: README.md, NOTA_ESCALA.md, NOTA_IA.md, DECISIONES.md.
+    </footer>
+
+  </main>
 </div>
 
-<section>
-  <h2>Ejercicio A — Agente de pre-calificación</h2>
-  <p class="subtitle">Simula un mensaje nuevo entrando por chat. El agente clasifica solo: responder / ignorar / escalar a humano.</p>
-  <form class="lead-form" onsubmit="enviarLead(event)">
-    <input id="f_lead_id" placeholder="lead_id (ej: L500)" required>
-    <input id="f_creador" placeholder="creador (ej: @carla.finanzas)" required>
-    <select id="f_canal"><option>CTWA</option><option>organico</option></select>
-    <input id="f_telefono" placeholder="teléfono (opcional)">
-    <input id="f_mensaje" class="full" placeholder="mensaje del lead..." required>
-    <div class="full"><button type="submit">Enviar mensaje al agente</button></div>
-  </form>
-  <div class="log" id="log"></div>
-</section>
-
-<section>
-  <h2>Ejercicio B — CRM (tablero por etapa)</h2>
-  <p class="subtitle">Cada columna es una etapa. Cambia la disposición de un lead desde su tarjeta.</p>
-  <div class="kanban" id="kanban"></div>
-</section>
-
-<section>
-  <h2>Cola de fallos / reintentos</h2>
-  <p class="subtitle">Errores del CRM (teléfono faltante, lead inexistente, disposición inválida) nunca se pierden en silencio.</p>
-  <div class="toolbar" style="margin:0 0 10px;">
-    <button class="secondary small" onclick="reintentarFallos()">Reintentar pendientes</button>
-  </div>
-  <table id="tabla-fallos"><thead><tr><th>Tipo</th><th>Error</th><th>Reintentos</th><th>Estado</th></tr></thead><tbody></tbody></table>
-</section>
-
-<section>
-  <h2>Ejercicio C — Reporting (sobre data/leads.csv + partner_enrollments.csv)</h2>
-  <p class="subtitle">Dataset histórico fijo, con errores a propósito — separado de la operación en vivo de arriba.</p>
-  <div class="grid-stats" id="stats-funnel"></div>
-  <h3 style="font-size:13px; margin:16px 0 6px;">Leads estancados</h3>
-  <table id="tabla-estancados"><thead><tr><th>Lead</th><th>Creador</th><th>Canal</th><th>Estado inicial</th></tr></thead><tbody></tbody></table>
-  <h3 style="font-size:13px; margin:16px 0 6px;">Qué rompería comisiones</h3>
-  <p id="texto-comisiones" style="font-size:13px; color: var(--muted);"></p>
-</section>
-
-<section>
-  <h2>Ejercicio D — Guiones de contenido priorizados</h2>
-  <div class="content-cards" id="content-cards"></div>
-</section>
-
 <script>
-const API = "";
-
 async function post(url, body) {
-  const res = await fetch(API + url, { method: "POST", headers: {"Content-Type":"application/json"}, body: body ? JSON.stringify(body) : undefined });
+  const res = await fetch(url, { method: "POST", headers: {"Content-Type":"application/json"}, body: body ? JSON.stringify(body) : undefined });
   return res.json();
 }
 async function get(url) {
-  const res = await fetch(API + url);
+  const res = await fetch(url);
   return res.json();
 }
 
-function logLine(texto) {
-  const log = document.getElementById("log");
-  const div = document.createElement("div");
-  div.textContent = texto;
-  log.prepend(div);
+const DECISION_LABEL = { responder: "Responder", escalar_humano: "Escalar a humano", ignorar: "Ignorar" };
+
+function addTimelineEntry(r) {
+  const tl = document.getElementById("timeline");
+  const empty = tl.querySelector(".tl-empty");
+  if (empty) empty.remove();
+
+  const item = document.createElement("div");
+  item.className = "tl-item " + r.decision;
+  const hora = new Date(r.timestamp || Date.now()).toLocaleTimeString();
+  item.innerHTML = `
+    <div class="tl-time">${hora} · ${r.lead_id}</div>
+    <div class="tl-head">${DECISION_LABEL[r.decision] || r.decision}</div>
+    <div class="tl-reason">${r.razon}</div>
+    ${r.draft_id ? `<div class="draft-bubble"><span class="stamp">Borrador · pendiente de revisión</span>Se dejó una respuesta lista para que un humano la apruebe antes de enviarla.</div>` : ""}
+  `;
+  tl.prepend(item);
 }
 
 async function enviarLead(ev) {
@@ -173,18 +387,26 @@ async function enviarLead(ev) {
     telefono: document.getElementById("f_telefono").value || null,
   };
   const r = await post("/webhook/lead", body);
-  logLine(`[${new Date().toLocaleTimeString()}] ${r.lead_id} -> ${r.decision} (${r.razon})`);
+  addTimelineEntry(r);
   document.getElementById("f_mensaje").value = "";
   cargarKanban();
 }
 
 async function cargarDemo() {
   await post("/demo/seed");
-  logLine("Demo cargada: 6 leads de ejemplo pasados por el agente + disposiciones aplicadas.");
+  document.getElementById("timeline").innerHTML = '<div class="tl-empty">Demo cargada — revisa el tablero de CRM abajo para ver dónde quedó cada lead.</div>';
   refrescarTodo();
 }
 
 const STAGES = ["Nuevo", "Sin Respuesta", "Info Enviada", "Reintentar Contacto", "Transferido a Consejero", "Cerrado - Sin Interés"];
+const STAGE_STYLE = {
+  "Nuevo": { bg: "#efece3" },
+  "Sin Respuesta": { bg: "#f1e2de" },
+  "Info Enviada": { bg: "#f4ead9" },
+  "Reintentar Contacto": { bg: "#f6edcf" },
+  "Transferido a Consejero": { bg: "#e3ece4" },
+  "Cerrado - Sin Interés": { bg: "#e9e6e0" },
+};
 const DISPOSICIONES = ["No Answer", "Info Sent", "Transferido", "Call Back", "No le interesa"];
 
 async function cargarKanban() {
@@ -193,18 +415,19 @@ async function cargarKanban() {
   kanban.innerHTML = "";
   for (const stage of STAGES) {
     const col = document.createElement("div");
-    col.className = "kanban-col";
+    col.className = "kcol";
+    col.style.background = STAGE_STYLE[stage].bg;
     const leadsEnStage = leads.filter(l => (l.stage || "Nuevo") === stage);
-    col.innerHTML = `<h3>${stage} (${leadsEnStage.length})</h3>`;
+    col.innerHTML = `<h4>${stage} · ${leadsEnStage.length}</h4>`;
     for (const lead of leadsEnStage) {
       const card = document.createElement("div");
-      card.className = "lead-card";
+      card.className = "kcard";
       card.innerHTML = `
-        <div class="lid">${lead.lead_id} <span class="badge ${lead.estado}">${lead.estado}</span></div>
+        <span class="lid">${lead.lead_id}</span><span class="tag ${lead.estado}">${lead.estado}</span>
         <div class="meta">${lead.creador} · ${lead.canal}</div>
-        <div>${(lead.mensaje || "").slice(0, 60)}...</div>
+        <div class="msg">${(lead.mensaje || "").slice(0, 58)}…</div>
         <select onchange="aplicarDisposicion('${lead.lead_id}', this.value)">
-          <option value="">Disposición...</option>
+          <option value="">Disposición…</option>
           ${DISPOSICIONES.map(d => `<option value="${d}">${d}</option>`).join("")}
         </select>
       `;
@@ -216,8 +439,7 @@ async function cargarKanban() {
 
 async function aplicarDisposicion(leadId, disposicion) {
   if (!disposicion) return;
-  const r = await post("/crm/disposition", { lead_id: leadId, disposicion });
-  logLine(`[${new Date().toLocaleTimeString()}] ${leadId}: disposición "${disposicion}" -> ${r.status}`);
+  await post("/crm/disposition", { lead_id: leadId, disposicion });
   cargarKanban();
   cargarFallos();
 }
@@ -225,7 +447,8 @@ async function aplicarDisposicion(leadId, disposicion) {
 async function cargarFallos() {
   const fallos = await get("/crm/failed-queue");
   const tbody = document.querySelector("#tabla-fallos tbody");
-  tbody.innerHTML = fallos.map(f => `<tr><td>${f.tipo}</td><td>${f.error}</td><td>${f.retry_count}</td><td>${f.status}</td></tr>`).join("") || "<tr><td colspan='4' style='color:var(--muted)'>Sin fallos pendientes</td></tr>";
+  tbody.innerHTML = fallos.map(f => `<tr><td>${f.tipo}</td><td>${f.error}</td><td>${f.retry_count}</td><td>${f.status}</td></tr>`).join("")
+    || `<tr><td colspan="4" style="color:var(--ink-muted)">Sin fallos pendientes.</td></tr>`;
 }
 
 async function reintentarFallos() {
@@ -236,30 +459,49 @@ async function reintentarFallos() {
 async function cargarReporting() {
   const funnel = await get("/reporting/funnel");
   const g = funnel.general;
-  document.getElementById("stats-funnel").innerHTML = `
-    <div class="stat-card"><div class="value">${g.leads_totales}</div><div class="label">Leads totales</div></div>
-    <div class="stat-card"><div class="value">${g.pre_calificados}</div><div class="label">Pre-calificados</div></div>
-    <div class="stat-card"><div class="value">${g.transferidos}</div><div class="label">Transferidos</div></div>
-    <div class="stat-card"><div class="value">${g.inscritos_activos}</div><div class="label">Inscritos activos</div></div>
-    <div class="stat-card"><div class="value">${g.tasa_transferencia_pct}%</div><div class="label">Tasa de transferencia</div></div>
-    <div class="stat-card"><div class="value">${g.tasa_inscripcion_pct}%</div><div class="label">Tasa de inscripción</div></div>
+
+  document.getElementById("hero-stats").innerHTML = `
+    <div><div class="num">${g.leads_totales}</div><div class="lbl">Leads en el histórico</div></div>
+    <div><div class="num">${g.tasa_transferencia_pct}%</div><div class="lbl">De pre-calificados llegan a transferirse</div></div>
+    <div><div class="num">${g.inscritos_activos}</div><div class="lbl">Inscripciones activas con el partner</div></div>
   `;
+
+  const steps = [
+    { label: "Leads totales", value: g.leads_totales },
+    { label: "Pre-calificados", value: g.pre_calificados },
+    { label: "Transferidos", value: g.transferidos },
+    { label: "Inscritos activos", value: g.inscritos_activos },
+  ];
+  const max = steps[0].value || 1;
+  document.getElementById("funnel").innerHTML = steps.map(s => `
+    <div class="funnel-row">
+      <div class="flabel">${s.label}</div>
+      <div class="funnel-track"><div class="funnel-fill" style="width:${Math.max(4, 100 * s.value / max)}%"></div></div>
+      <div class="fval">${s.value}</div>
+    </div>
+  `).join("");
 
   const estancados = await get("/reporting/stalled-leads");
   document.querySelector("#tabla-estancados tbody").innerHTML = estancados.map(l =>
     `<tr><td>${l.lead_id}</td><td>${l.creador}</td><td>${l.canal}</td><td>${l.estado_inicial}</td></tr>`
-  ).join("") || "<tr><td colspan='4' style='color:var(--muted)'>Ninguno</td></tr>";
+  ).join("") || `<tr><td colspan="4" style="color:var(--ink-muted)">Ninguno en este momento.</td></tr>`;
 
-  const comisiones = await get("/reporting/commission-breaks");
-  document.getElementById("texto-comisiones").textContent =
-    `${comisiones.resumen} (sin creator_id: ${comisiones.inscripciones_sin_creator_id}, teléfono mismatch: ${comisiones.inscripciones_con_telefono_mismatch})`;
+  const c = await get("/reporting/commission-breaks");
+  document.getElementById("callout-comisiones").innerHTML = `
+    <strong>${c.inscripciones_sin_creator_id} inscripciones sin creador asignado</strong> y
+    <strong>${c.inscripciones_con_telefono_mismatch} con teléfono que no coincide</strong> con el lead original.
+    <div class="figures">${c.resumen}</div>
+  `;
 }
 
 async function cargarContenido() {
   const guiones = await get("/content/scripts?top_n=3");
-  document.getElementById("content-cards").innerHTML = guiones.map(g =>
-    `<div class="content-card"><div class="score">Fuente ${g.fuente_id} · score ${g.prioridad_score} · ${g.duracion_estimada_seg}s</div>${g.guion}</div>`
-  ).join("");
+  document.getElementById("content-cards").innerHTML = guiones.map(g => `
+    <div class="script-card">
+      <div class="strip"><span>Fuente ${g.fuente_id}</span><span>score ${g.prioridad_score} · ${g.duracion_estimada_seg}s</span></div>
+      <div class="body">${g.guion.replace(/\[(.*?)\]/g, "<b>[$1]</b>")}</div>
+    </div>
+  `).join("");
 }
 
 function refrescarTodo() {
