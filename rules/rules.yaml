@@ -1,0 +1,57 @@
+# Reglas de negocio editables — Salvaguardas Doble B
+# Este archivo se recarga en cada request. Para cambiar el comportamiento del
+# agente de pre-calificación o del CRM NO toques el código, edita esto.
+
+# Si el mensaje contiene alguna de estas palabras, SIEMPRE se escala a un humano,
+# sin importar lo demás (riesgo legal, seguridad, o casos ambiguos).
+escalar_keywords:
+  - "demanda"
+  - "abogado"
+  - "embargo"
+  - "suicid"
+  - "amenaza"
+  - "denuncia"
+  - "fraude"
+  - "urgente"
+  - "quiebra"
+  - "no entiendo"
+
+# Si el mensaje contiene alguna de estas palabras, se ignora (el lead se
+# está dando de baja o no quiere seguir).
+ignorar_keywords:
+  - "no me interesa"
+  - "quitame"
+  - "quítame"
+  - "stop"
+  - "baja"
+  - "spam"
+  - "no volver a escribir"
+
+# Umbrales de monto de deuda (en COP). Fuera de este rango se escala a
+# revisión manual: montos muy bajos no son rentables para el partner,
+# montos muy altos son casos atípicos que requieren criterio humano.
+deuda:
+  monto_minimo: 1000000
+  monto_maximo_auto: 80000000
+
+# Palabras clave para inferir el tipo de deuda mencionado en el mensaje.
+palabras_tipo_deuda:
+  tarjeta_credito: ["tarjeta", "tdc", "credito de tarjeta"]
+  libranza: ["libranza", "nomina"]
+  libre_inversion: ["libre inversion", "credito de consumo", "libre inversión"]
+  hipotecario: ["hipoteca", "casa", "vivienda"]
+
+# Palabras que indican que el lead quiere hablar con un Consejero.
+consejero_interes_keywords:
+  - "consejero"
+  - "asesoria"
+  - "asesoría"
+  - "ayuda"
+  - "programa"
+  - "quiero inscribirme"
+  - "informacion"
+  - "información"
+
+# Un lead sin cambio de disposición en más de este número de días se
+# considera "estancado" en el reporting (Ejercicio C).
+leads_estancados_dias: 3

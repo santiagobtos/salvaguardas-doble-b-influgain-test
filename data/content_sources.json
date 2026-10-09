@@ -1,0 +1,82 @@
+[
+  {
+    "id": "S01",
+    "texto": "¿Esto afecta mi historial de crédito?",
+    "tema": "tarjeta de crédito",
+    "detalle": "les preocupa el impacto en su reporte más que la deuda misma.",
+    "frecuencia": 18,
+    "urgencia": "alta"
+  },
+  {
+    "id": "S02",
+    "texto": "¿De verdad me pueden ayudar a pagar menos?",
+    "tema": "deudas en general",
+    "detalle": "quieren saber qué tan real es el programa.",
+    "frecuencia": 22,
+    "urgencia": "alta"
+  },
+  {
+    "id": "S03",
+    "texto": "¿Tengo que dar información bancaria?",
+    "tema": "seguridad",
+    "detalle": "desconfían de compartir datos sensibles.",
+    "frecuencia": 9,
+    "urgencia": "media"
+  },
+  {
+    "id": "S04",
+    "texto": "Me llamaron de un banco amenazando con demanda",
+    "tema": "cobranza agresiva",
+    "detalle": "sienten presión y no saben si es legal.",
+    "frecuencia": 14,
+    "urgencia": "alta"
+  },
+  {
+    "id": "S05",
+    "texto": "¿Cuánto cuesta el programa?",
+    "tema": "costos",
+    "detalle": "temen que sea otro gasto más.",
+    "frecuencia": 16,
+    "urgencia": "media"
+  },
+  {
+    "id": "S06",
+    "texto": "Tengo varias deudas, ¿por cuál empiezo?",
+    "tema": "libranza",
+    "detalle": "no saben priorizar entre varios créditos.",
+    "frecuencia": 11,
+    "urgencia": "media"
+  },
+  {
+    "id": "S07",
+    "texto": "¿Esto es lo mismo que un abogado de deudas?",
+    "tema": "confusión de servicio",
+    "detalle": "confunden el programa con servicios legales.",
+    "frecuencia": 7,
+    "urgencia": "baja"
+  },
+  {
+    "id": "S08",
+    "texto": "Perdí mi trabajo y no puedo pagar la tarjeta",
+    "tema": "tarjeta de crédito",
+    "detalle": "situación de urgencia económica reciente.",
+    "frecuencia": 13,
+    "urgencia": "alta"
+  },
+  {
+    "id": "S09",
+    "texto": "¿Cuánto tiempo se demora el proceso?",
+    "tema": "expectativas",
+    "detalle": "quieren una línea de tiempo realista.",
+    "frecuencia": 10,
+    "urgencia": "baja"
+  },
+  {
+    "id": "S10",
+    "texto": "¿Qué pasa con mi hipoteca si entro al programa?",
+    "tema": "hipotecario",
+    "detalle": "temen perder la vivienda.",
+    "frecuencia": 6,
+    "urgencia": "media"
+  }
+]
