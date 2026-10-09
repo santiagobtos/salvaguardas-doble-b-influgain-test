@@ -272,10 +272,16 @@ def stack_fragment():
           <div class="field-value">{lead_detalle['mensaje']}</div>
         """
         if ultima_decision:
+            label_razon = "Motivo" if badge == "escalar_humano" else "Por qué el sistema decidió esto"
             detalle_html += f"""
-          <div class="field-label">Por qué el sistema decidió esto</div>
+          <div class="field-label">{label_razon}</div>
           <div class="field-value">{ultima_decision['razon']}</div>
             """
+            if badge == "escalar_humano" and ultima_decision.get("resumen"):
+                detalle_html += f"""
+          <div class="field-label">Resumen para el agente</div>
+          <div class="field-value">{ultima_decision['resumen']}</div>
+                """
         if lead_detalle.get("monto_deuda") or lead_detalle.get("tipo_deuda"):
             detalle_html += f"""
           <div class="field-label">Pre-calificación</div>
@@ -337,7 +343,8 @@ def stack_fragment():
     )
     filas_log = evento_log.selection["rows"] if evento_log and evento_log.selection else []
     if filas_log:
-        draft_id_sel = df_log.iloc[filas_log[0]]["draft_id"]
+        fila_log_sel = df_log.iloc[filas_log[0]]
+        draft_id_sel = fila_log_sel["draft_id"]
         if pd.notna(draft_id_sel):
             draft_match = next((d for d in db.listar_drafts() if d["draft_id"] == int(draft_id_sel)), None)
             if draft_match:
@@ -345,8 +352,13 @@ def stack_fragment():
                     f'<div class="chat-bubble draft"><span class="stamp">Borrador #{draft_match["draft_id"]} · {draft_match["status"]}</span>{draft_match["contenido"]}</div>',
                     unsafe_allow_html=True,
                 )
+        elif fila_log_sel["decision"] == "escalar_humano" and fila_log_sel.get("resumen"):
+            st.markdown(
+                f'<div class="chat-bubble"><span class="stamp">Resumen para el agente</span>{fila_log_sel["resumen"]}</div>',
+                unsafe_allow_html=True,
+            )
         else:
-            st.caption("Este lead no generó borrador (fue ignorado o escalado a un humano).")
+            st.caption("Este lead no generó borrador (fue ignorado).")
 
 
 # --------------------------------------------------------------- top bar --

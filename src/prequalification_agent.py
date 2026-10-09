@@ -77,6 +77,31 @@ def _construir_razon_responder(tipo_deuda, monto, interes_consejero):
     return razon
 
 
+# Cuando se escala, el agente humano no ve el mensaje crudo y ya — recibe
+# un resumen corto armado para que entienda el caso de un vistazo, sin
+# tener que ir a leer el mensaje completo primero.
+_RESUMEN_ESCALADO = [
+    'Lead de {creador} por {canal}. Escribe: "{mensaje_corto}". Se escala porque {razon_min}. '
+    "No se generó ninguna respuesta automática — queda a la espera de revisión humana.",
+    '{creador} ({canal}) contactó con: "{mensaje_corto}". Motivo de escalamiento: {razon_min}. '
+    "Un agente debe revisar antes de responder o transferir.",
+    'Mensaje de {creador} vía {canal}: "{mensaje_corto}". Se marcó para revisión humana '
+    "({razon_min}) — nada se envió todavía.",
+]
+
+
+def _truncar(texto, n=140):
+    texto = texto.strip()
+    return texto if len(texto) <= n else texto[: n - 1].rstrip() + "…"
+
+
+def construir_resumen_escalado(creador, canal, mensaje, razon):
+    razon_min = (razon[0].lower() + razon[1:]) if razon else "motivo no especificado"
+    return random.choice(_RESUMEN_ESCALADO).format(
+        creador=creador, canal=canal, mensaje_corto=_truncar(mensaje), razon_min=razon_min,
+    )
+
+
 def generar_draft_respuesta(tipo_deuda):
     tipo_frase = _TIPO_DEUDA_FRASES.get(tipo_deuda, "deuda")
     return " ".join([
@@ -104,6 +129,7 @@ def procesar_mensaje_entrante(lead_id, creador, canal, mensaje, telefono):
     )
 
     draft_id = None
+    resumen = None
 
     if decision == "responder":
         monto = extraer_monto_deuda(mensaje)
@@ -114,13 +140,16 @@ def procesar_mensaje_entrante(lead_id, creador, canal, mensaje, telefono):
 
         contenido = generar_draft_respuesta(tipo_deuda)
         draft_id = db.crear_draft(lead_id, timestamp, canal=canal, contenido=contenido)
+    elif decision == "escalar_humano":
+        resumen = construir_resumen_escalado(creador, canal, mensaje, razon)
 
-    db.log_decision(timestamp, lead_id, decision, razon, draft_id)
+    db.log_decision(timestamp, lead_id, decision, razon, draft_id, resumen)
 
     return {
         "lead_id": lead_id,
         "decision": decision,
         "razon": razon,
+        "resumen": resumen,
         "draft_id": draft_id,
         "timestamp": timestamp,
     }

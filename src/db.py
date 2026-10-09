@@ -34,7 +34,8 @@ CREATE TABLE IF NOT EXISTS decisions_log (
     lead_id TEXT,
     decision TEXT,
     razon TEXT,
-    draft_id INTEGER
+    draft_id INTEGER,
+    resumen TEXT
 );
 
 CREATE TABLE IF NOT EXISTS drafts (
@@ -79,7 +80,11 @@ def get_connection():
 def init_db():
     conn = get_connection()
     conn.executescript(SCHEMA)
-    conn.commit()
+    try:
+        conn.execute("ALTER TABLE decisions_log ADD COLUMN resumen TEXT")
+        conn.commit()
+    except sqlite3.OperationalError:
+        pass  # ya existe (base creada con un esquema anterior)
     conn.close()
 
 
@@ -163,11 +168,11 @@ def listar_drafts(status=None):
     return [dict(r) for r in rows]
 
 
-def log_decision(timestamp, lead_id, decision, razon, draft_id):
+def log_decision(timestamp, lead_id, decision, razon, draft_id, resumen=None):
     conn = get_connection()
     conn.execute(
-        "INSERT INTO decisions_log (timestamp, lead_id, decision, razon, draft_id) VALUES (?, ?, ?, ?, ?)",
-        (timestamp, lead_id, decision, razon, draft_id),
+        "INSERT INTO decisions_log (timestamp, lead_id, decision, razon, draft_id, resumen) VALUES (?, ?, ?, ?, ?, ?)",
+        (timestamp, lead_id, decision, razon, draft_id, resumen),
     )
     conn.commit()
     conn.close()
