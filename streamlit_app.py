@@ -23,7 +23,6 @@ RULES_PATH = Path(__file__).resolve().parent / "rules" / "rules.yaml"
 
 st.set_page_config(
     page_title="Salvaguardas Doble B — Panel de Operación",
-    page_icon="🗂️",
     layout="wide",
 )
 
@@ -61,7 +60,7 @@ h1, h2, h3 { font-family: 'Inter', sans-serif !important; font-weight: 800 !impo
 .lead-card .meta { color: var(--ink-muted); font-size:12.5px; margin-bottom:12px; }
 .lead-card .field-label { font-size:10.5px; text-transform:uppercase; letter-spacing:.05em; color: var(--ink-muted); font-weight:700; margin-top:14px; }
 .lead-card .field-value { font-size:14px; color: var(--ink); margin-top:2px; }
-.top-banner { background: var(--gray-tint); color: var(--ink-soft); font-size: 12.5px; padding: 8px 14px; margin-bottom: 10px; border-radius: 8px; text-align: center; }
+.top-banner { background: var(--gray-tint); color: var(--ink-soft); font-size: 12.5px; padding: 8px 14px; margin-top: 2.2rem; margin-bottom: 10px; border-radius: 8px; text-align: center; }
 .top-banner b { color: var(--ink); }
 .topbar-brand { font-size: 17px; font-weight: 800; padding-top: 6px; }
 .topbar-brand .topbar-sub { color: var(--ink-muted); font-weight: 400; font-size: 12.5px; margin-left: 6px; }
@@ -255,6 +254,7 @@ def stack_fragment():
     )
 
     filas_sel = evento.selection["rows"] if evento and evento.selection else []
+    lead_id_sel = None
     if filas_sel:
         lead_id_sel = df_view.iloc[filas_sel[0]]["ID"]
         lead_detalle = db.get_lead(lead_id_sel)
@@ -312,7 +312,15 @@ def stack_fragment():
     df_log_view = df_log[["timestamp", "lead_id", "decision", "razon", "borrador"]].rename(columns={
         "timestamp": "Timestamp", "lead_id": "Lead", "decision": "Decisión",
         "razon": "Razón", "borrador": "Link al borrador",
-    })
+    }).reset_index(drop=True)
+
+    # Si se seleccionó un lead en el stack de arriba, se selecciona también
+    # su fila correspondiente aquí — hay que fijar esto en session_state
+    # ANTES de instanciar la tabla para que nazca ya con esa fila marcada.
+    if lead_id_sel is not None:
+        pos_match = df_log_view.index[df_log_view["Lead"] == lead_id_sel].tolist()
+        if pos_match:
+            st.session_state["log_decisiones_tabla"] = {"selection": {"rows": [pos_match[0]], "columns": []}}
 
     evento_log = st.dataframe(
         df_log_view,
@@ -346,7 +354,7 @@ def stack_fragment():
 # un sitio tipo Notion — banner delgado, barra de marca, y debajo las
 # pestañas, sin título/hero por encima que empuje todo hacia abajo.
 st.markdown(
-    '<div class="top-banner">🗂️ <b>Escenario 100% ficticio</b> — ni la marca, ni los leads, '
+    '<div class="top-banner"><b>Escenario 100% ficticio</b> — ni la marca, ni los leads, '
     "ni las inscripciones del partner existen. Nada aquí toca un sistema real.</div>",
     unsafe_allow_html=True,
 )
@@ -354,17 +362,17 @@ st.markdown(
 topbar_l, topbar_r = st.columns([4, 1])
 with topbar_l:
     st.markdown(
-        '<div class="topbar-brand">🗂️ Salvaguardas Doble B '
+        '<div class="topbar-brand">Salvaguardas Doble B '
         '<span class="topbar-sub">× Consejería Clara — prueba técnica Influgain</span></div>',
         unsafe_allow_html=True,
     )
 with topbar_r:
-    if st.button("🔄 Reiniciar panel", use_container_width=True):
+    if st.button("Reiniciar panel", use_container_width=True):
         resetear_operacion_en_vivo()
         st.rerun()
 
 tab_inicio, tab_a, tab_b, tab_c, tab_d = st.tabs(
-    ["🏠 Inicio", "Leads que llegan", "B · CRM y disposiciones", "C · Datos y reporting", "D · Contenido"]
+    ["Inicio", "Leads que llegan", "B · CRM y disposiciones", "C · Datos y reporting", "D · Contenido"]
 )
 
 # ======================================================================= #
