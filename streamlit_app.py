@@ -9,13 +9,17 @@ Correr: streamlit run streamlit_app.py
 import random
 import time
 from datetime import datetime, timezone
+from pathlib import Path
 
 import pandas as pd
 import streamlit as st
+import yaml
 
 from src import crm_automation, db, reporting
 from src.content_system import generar_guiones
 from src.prequalification_agent import procesar_mensaje_entrante
+
+RULES_PATH = Path(__file__).resolve().parent / "rules" / "rules.yaml"
 
 st.set_page_config(
     page_title="Salvaguardas Doble B — Panel de Operación",
@@ -79,23 +83,6 @@ st.session_state.setdefault("auto_gen_activo", False)
 st.session_state.setdefault("ultimo_auto_gen_ts", 0.0)
 
 # --------------------------------------------------------- datos iniciales --
-# Carga por defecto: un set curado y reconocible (no aleatorio) para la
-# primera carga, mezclando los 3 caminos de clasificación.
-CARGA_DEFECTO = [
-    ("@carla.finanzas", "CTWA", "Hola, tengo una deuda de tarjeta de credito de 3200000 y no se que hacer", "3001000001"),
-    ("@juanfi_libre", "organico", "Buenas, debo libranza por 11000000, quiero informacion del programa", "3001000002"),
-    ("@manu.deudas", "CTWA", "Me interesa el programa, tengo una deuda hipotecaria de 38000000", "3001000003"),
-    ("@laura_consejos", "organico", "Hola vi el video, debo como 2600000 en tarjeta, quiero hablar con un consejero", "3001000004"),
-    ("@pedro.ahorra", "CTWA", "Buenas tardes, tengo varias deudas y no sé por dónde empezar, suman 17000000", "3001000005"),
-    ("@carla.finanzas", "organico", "Hola quiero asesoria para mi libranza de nomina de 8700000", "3001000006"),
-    ("@manu.deudas", "CTWA", "Me llego una demanda por mi tarjeta de credito, que hago", "3001000007"),
-    ("@juanfi_libre", "organico", "Un abogado me contacto por el embargo de mi cuenta, estoy preocupado", "3001000008"),
-    ("@pedro.ahorra", "CTWA", "No me interesa, quitame de esta lista por favor", "3001000009"),
-    ("@laura_consejos", "organico", "Stop, no quiero recibir mas mensajes", "3001000010"),
-    ("@carla.finanzas", "CTWA", "Hola, quiero mas informacion sobre el programa", "3001000011"),
-    ("@manu.deudas", "organico", "Buenas, como funciona la consejeria de ustedes", "3001000012"),
-]
-
 # Pool para la generación automática — plantillas parecidas a mensajes
 # reales, combinadas con montos, creadores y teléfonos aleatorios en cada
 # generación para que ningún lead se repita igual. Agrupado por categoría
@@ -166,6 +153,24 @@ MONTOS_POOL = [
 ]
 
 
+def _generar_carga_defecto(n=42):
+    """Set reproducible (semilla fija, no toca el random global) para la
+    primera carga — mínimo 42 leads mezclando los 3 caminos de clasificación."""
+    rnd = random.Random(7)
+    entradas = []
+    for i in range(n):
+        plantilla = rnd.choice(MENSAJES_POOL)
+        mensaje = plantilla.format(monto=rnd.choice(MONTOS_POOL)) if "{monto}" in plantilla else plantilla
+        creador = rnd.choice(CREADORES_POOL)
+        canal = rnd.choices(["CTWA", "organico"], weights=[60, 40])[0]
+        telefono = "300" + "".join(str(rnd.randint(0, 9)) for _ in range(7))
+        entradas.append((creador, canal, mensaje, telefono))
+    return entradas
+
+
+CARGA_DEFECTO = _generar_carga_defecto(42)
+
+
 def _telefono_aleatorio():
     return "3" + "".join(str(random.randint(0, 9)) for _ in range(9))
 
@@ -213,7 +218,7 @@ def stack_fragment():
             lead = generar_lead_aleatorio(siguiente_lead_id())
             ingresar_lead(lead["creador"], lead["canal"], lead["mensaje"], lead["telefono"], lead_id=lead["lead_id"])
             st.session_state["ultimo_auto_gen_ts"] = ahora
-            st.toast(f"📥 Nuevo lead automático: {lead['lead_id']}")
+            st.toast(f"Nuevo lead automático: {lead['lead_id']}")
 
     leads_actuales = db.listar_leads()
     st.markdown(f"**Stack de leads** &nbsp;·&nbsp; {len(leads_actuales)} en total &nbsp;·&nbsp; <span style='color:var(--ink-muted); font-weight:400; font-size:12.5px;'>clic en una fila para ver el detalle</span>", unsafe_allow_html=True)
@@ -250,46 +255,90 @@ def stack_fragment():
     )
 
     filas_sel = evento.selection["rows"] if evento and evento.selection else []
-    if not filas_sel:
+    if filas_sel:
+        lead_id_sel = df_view.iloc[filas_sel[0]]["ID"]
+        lead_detalle = db.get_lead(lead_id_sel)
+        decisiones_lead = [d for d in db.listar_decisiones() if d["lead_id"] == lead_id_sel]
+        drafts_lead = [d for d in db.listar_drafts() if d["lead_id"] == lead_id_sel]
+        ultima_decision = decisiones_lead[-1] if decisiones_lead else None
+        ultimo_draft = drafts_lead[-1] if drafts_lead else None
+
+        badge = lead_detalle["estado"]
+        detalle_html = f"""
+        <div class="lead-card">
+          <h4>{lead_detalle['lead_id']} <span class="badge {badge}">{badge.replace('_',' ')}</span></h4>
+          <div class="meta">{lead_detalle['creador']} · {lead_detalle['canal']} · {lead_detalle.get('telefono') or 'sin teléfono'} · llegó {lead_detalle['timestamp']}</div>
+          <div class="field-label">Mensaje</div>
+          <div class="field-value">{lead_detalle['mensaje']}</div>
+        """
+        if ultima_decision:
+            detalle_html += f"""
+          <div class="field-label">Por qué el sistema decidió esto</div>
+          <div class="field-value">{ultima_decision['razon']}</div>
+            """
+        if lead_detalle.get("monto_deuda") or lead_detalle.get("tipo_deuda"):
+            detalle_html += f"""
+          <div class="field-label">Pre-calificación</div>
+          <div class="field-value">Monto: {lead_detalle.get('monto_deuda') or '—'} · Tipo de deuda: {lead_detalle.get('tipo_deuda') or '—'} · Interés en Consejero: {'sí' if lead_detalle.get('interes_consejero') else 'no'}</div>
+            """
+        detalle_html += f"""
+          <div class="field-label">Etapa actual en el CRM</div>
+          <div class="field-value">{lead_detalle['stage']}</div>
+        </div>
+        """
+        st.markdown(detalle_html, unsafe_allow_html=True)
+
+        if ultimo_draft:
+            st.markdown(
+                f'<div class="chat-bubble draft"><span class="stamp">Borrador generado · {ultimo_draft["status"]}</span>{ultimo_draft["contenido"]}</div>',
+                unsafe_allow_html=True,
+            )
+
+    # ---- Log mínimo: timestamp, lead_id, decisión, razón, link al borrador ----
+    decisiones_todas = db.listar_decisiones()
+    if not decisiones_todas:
         return
 
-    lead_id_sel = df_view.iloc[filas_sel[0]]["ID"]
-    lead_detalle = db.get_lead(lead_id_sel)
-    decisiones_lead = [d for d in db.listar_decisiones() if d["lead_id"] == lead_id_sel]
-    drafts_lead = [d for d in db.listar_drafts() if d["lead_id"] == lead_id_sel]
-    ultima_decision = decisiones_lead[-1] if decisiones_lead else None
-    ultimo_draft = drafts_lead[-1] if drafts_lead else None
+    st.markdown(
+        "**Log de decisiones** &nbsp;·&nbsp; "
+        "<span style='color:var(--ink-muted); font-weight:400; font-size:12.5px;'>"
+        "timestamp, lead, decisión, razón y link al borrador — clic en una fila para abrir el borrador</span>",
+        unsafe_allow_html=True,
+    )
+    df_log = pd.DataFrame(decisiones_todas).sort_values("id", ascending=False)
+    df_log["borrador"] = df_log["draft_id"].apply(
+        lambda d: f"Ver borrador #{int(d)}" if pd.notna(d) else "— sin borrador"
+    )
+    df_log_view = df_log[["timestamp", "lead_id", "decision", "razon", "borrador"]].rename(columns={
+        "timestamp": "Timestamp", "lead_id": "Lead", "decision": "Decisión",
+        "razon": "Razón", "borrador": "Link al borrador",
+    })
 
-    badge = lead_detalle["estado"]
-    detalle_html = f"""
-    <div class="lead-card">
-      <h4>{lead_detalle['lead_id']} <span class="badge {badge}">{badge.replace('_',' ')}</span></h4>
-      <div class="meta">{lead_detalle['creador']} · {lead_detalle['canal']} · {lead_detalle.get('telefono') or 'sin teléfono'} · llegó {lead_detalle['timestamp']}</div>
-      <div class="field-label">Mensaje</div>
-      <div class="field-value">{lead_detalle['mensaje']}</div>
-    """
-    if ultima_decision:
-        detalle_html += f"""
-      <div class="field-label">Por qué el sistema decidió esto</div>
-      <div class="field-value">{ultima_decision['razon']}</div>
-        """
-    if lead_detalle.get("monto_deuda") or lead_detalle.get("tipo_deuda"):
-        detalle_html += f"""
-      <div class="field-label">Pre-calificación</div>
-      <div class="field-value">Monto: {lead_detalle.get('monto_deuda') or '—'} · Tipo de deuda: {lead_detalle.get('tipo_deuda') or '—'} · Interés en Consejero: {'sí' if lead_detalle.get('interes_consejero') else 'no'}</div>
-        """
-    detalle_html += f"""
-      <div class="field-label">Etapa actual en el CRM</div>
-      <div class="field-value">{lead_detalle['stage']}</div>
-    </div>
-    """
-    st.markdown(detalle_html, unsafe_allow_html=True)
-
-    if ultimo_draft:
-        st.markdown(
-            f'<div class="chat-bubble draft"><span class="stamp">Borrador generado · {ultimo_draft["status"]}</span>{ultimo_draft["contenido"]}</div>',
-            unsafe_allow_html=True,
-        )
+    evento_log = st.dataframe(
+        df_log_view,
+        use_container_width=True,
+        hide_index=True,
+        height=260,
+        on_select="rerun",
+        selection_mode="single-row",
+        key="log_decisiones_tabla",
+        column_config={
+            "Razón": st.column_config.TextColumn(width="large"),
+            "Link al borrador": st.column_config.TextColumn(width="medium"),
+        },
+    )
+    filas_log = evento_log.selection["rows"] if evento_log and evento_log.selection else []
+    if filas_log:
+        draft_id_sel = df_log.iloc[filas_log[0]]["draft_id"]
+        if pd.notna(draft_id_sel):
+            draft_match = next((d for d in db.listar_drafts() if d["draft_id"] == int(draft_id_sel)), None)
+            if draft_match:
+                st.markdown(
+                    f'<div class="chat-bubble draft"><span class="stamp">Borrador #{draft_match["draft_id"]} · {draft_match["status"]}</span>{draft_match["contenido"]}</div>',
+                    unsafe_allow_html=True,
+                )
+        else:
+            st.caption("Este lead no generó borrador (fue ignorado o escalado a un humano).")
 
 
 # --------------------------------------------------------------- top bar --
@@ -378,14 +427,14 @@ with tab_a:
     if not st.session_state["primera_carga_hecha"]:
         # ---- Estado inicial: todavía no se ha hecho la primera carga ----
         st.markdown("#### Primera carga")
-        st.caption("Antes de que el panel empiece a recibir leads, cárgalo con un set inicial.")
-        if st.button("📥 Cargar leads por defecto", type="primary"):
+        st.caption(f"Antes de que el panel empiece a recibir leads, cárgalo con un set inicial ({len(CARGA_DEFECTO)} leads).")
+        if st.button("Cargar leads por defecto", type="primary"):
             for i, (creador, canal, mensaje, telefono) in enumerate(CARGA_DEFECTO, start=1):
                 ingresar_lead(creador, canal, mensaje, telefono, lead_id=f"P{i:03d}")
             st.session_state["primera_carga_hecha"] = True
             st.rerun()
 
-        with st.expander("➕ O añade un lead manualmente para empezar"):
+        with st.expander("O añade un lead manualmente para empezar"):
             with st.form("form_lead_inicial", clear_on_submit=True):
                 fc1, fc2, fc3 = st.columns(3)
                 creador = fc1.text_input("creador", placeholder="@carla.finanzas")
@@ -403,7 +452,7 @@ with tab_a:
         ctrl1, ctrl2 = st.columns([2, 1])
         with ctrl1:
             activo = st.toggle(
-                "🔁 Generar un lead nuevo cada 30 segundos (totalmente aleatorio)",
+                "Generar un lead nuevo cada 30 segundos (totalmente aleatorio)",
                 key="auto_gen_activo",
             )
             if activo:
@@ -411,7 +460,7 @@ with tab_a:
             else:
                 st.caption("Apagado — actívalo para que el panel reciba leads solo, como lo haría un webhook real.")
         with ctrl2:
-            with st.popover("➕ Añadir lead manual"):
+            with st.popover("Añadir lead manual"):
                 with st.form("form_lead_manual", clear_on_submit=True):
                     creador = st.text_input("creador", placeholder="@carla.finanzas")
                     canal = st.selectbox("canal", ["CTWA", "organico"])
@@ -423,6 +472,26 @@ with tab_a:
                     st.rerun()
 
         stack_fragment()
+
+        with st.expander("Reglas de clasificación (editables fuera del código)"):
+            st.caption(
+                "Viven en rules/rules.yaml, no en el código del agente. Se leen de nuevo en cada "
+                "mensaje — cambia algo aquí, guarda, y el próximo lead ya se clasifica distinto, "
+                "sin reiniciar el panel."
+            )
+            reglas_texto_actual = RULES_PATH.read_text(encoding="utf-8")
+            reglas_editadas = st.text_area(
+                "rules/rules.yaml", value=reglas_texto_actual, height=320, key="reglas_editor", label_visibility="collapsed",
+            )
+            rcol1, rcol2 = st.columns([1, 3])
+            if rcol1.button("Guardar reglas"):
+                try:
+                    yaml.safe_load(reglas_editadas)
+                except yaml.YAMLError as e:
+                    st.error(f"El YAML no es válido, no se guardó: {e}")
+                else:
+                    RULES_PATH.write_text(reglas_editadas, encoding="utf-8")
+                    st.success("Reglas guardadas. El próximo mensaje ya se clasifica con los valores nuevos.")
 
 # ======================================================================= #
 # EJERCICIO B — MÓDULO 1                                                   #

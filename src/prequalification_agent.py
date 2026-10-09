@@ -48,6 +48,34 @@ _TIPO_DEUDA_FRASES = {
     "no_especificado": "deuda",
 }
 
+# La mayoría de leads dicen, en esencia, "tengo esta deuda, ayúdenme" — la
+# razón se arma reflejando ESE caso puntual (tipo de deuda, si dio un monto,
+# si pidió hablar con un Consejero) en vez de repetir siempre la misma
+# frase, pero sin inventar nada que el mensaje no diga.
+_RAZON_CON_MONTO = [
+    "Pide ayuda con su {tipo_frase} y da un monto ({monto_frase}) — caso estándar, se puede responder.",
+    "Cuenta que tiene {tipo_frase} por {monto_frase} y pregunta qué puede hacer — dentro de lo normal.",
+    "Menciona {tipo_frase} de {monto_frase} y pide orientación, nada fuera de lo común.",
+]
+_RAZON_SIN_MONTO = [
+    "Pide ayuda con su {tipo_frase}, sin dar un monto exacto — dentro de lo normal, se puede responder.",
+    "Pregunta por el programa en relación a {tipo_frase}, mensaje estándar sin datos de riesgo.",
+    "Cuenta que tiene {tipo_frase} y quiere saber más — caso típico, no hay nada que escalar.",
+]
+_RAZON_INTERES_EXTRA = " Además pide hablar con un Consejero."
+
+
+def _construir_razon_responder(tipo_deuda, monto, interes_consejero):
+    tipo_frase = _TIPO_DEUDA_FRASES.get(tipo_deuda, "una deuda")
+    if monto:
+        monto_frase = f"${monto:,}".replace(",", ".")
+        razon = random.choice(_RAZON_CON_MONTO).format(tipo_frase=tipo_frase, monto_frase=monto_frase)
+    else:
+        razon = random.choice(_RAZON_SIN_MONTO).format(tipo_frase=tipo_frase)
+    if interes_consejero:
+        razon += _RAZON_INTERES_EXTRA
+    return razon
+
 
 def generar_draft_respuesta(tipo_deuda):
     tipo_frase = _TIPO_DEUDA_FRASES.get(tipo_deuda, "deuda")
@@ -82,6 +110,7 @@ def procesar_mensaje_entrante(lead_id, creador, canal, mensaje, telefono):
         tipo_deuda = extraer_tipo_deuda(mensaje, rules)
         interes = tiene_interes_consejero(mensaje, rules)
         db.actualizar_prequalificacion(lead_id, monto, tipo_deuda, interes)
+        razon = _construir_razon_responder(tipo_deuda, monto, interes)
 
         contenido = generar_draft_respuesta(tipo_deuda)
         draft_id = db.crear_draft(lead_id, timestamp, canal=canal, contenido=contenido)
