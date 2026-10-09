@@ -110,6 +110,13 @@ def upsert_lead(lead_id, timestamp, creador, canal, mensaje, telefono, estado):
     conn.close()
 
 
+def listar_leads():
+    conn = get_connection()
+    rows = conn.execute("SELECT * FROM leads ORDER BY timestamp DESC").fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
 def actualizar_prequalificacion(lead_id, monto_deuda, tipo_deuda, interes_consejero):
     conn = get_connection()
     conn.execute(

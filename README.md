@@ -28,19 +28,26 @@ pytest
 # 4. Correr la demo completa (Ejercicios A -> B -> C -> D en consola)
 python cli.py demo
 
-# 5. Levantar la API para probar los webhooks interactivamente
+# 5. Levantar la API + el dashboard visual
 uvicorn webhook_server:app --reload
-# Abrir http://127.0.0.1:8000/docs
+# Dashboard:        http://127.0.0.1:8000/
+# Docs de la API:   http://127.0.0.1:8000/docs
 ```
+
+En el dashboard, el botón **"Cargar demo"** resetea la base y pasa 6 leads de
+ejemplo por el agente real (no son datos falseados en la UI), dejando el
+tablero de CRM poblado en distintas etapas para grabar el video. Desde ahí
+puedes además mandar un mensaje nuevo, cambiar disposiciones y ver el efecto
+en vivo.
 
 ## Qué hace cada pieza
 
-| Ejercicio | Código | Qué prueba |
-|---|---|---|
-| A — Pre-calificación + handoff | `src/prequalification_agent.py`, `POST /webhook/lead` | Ingesta un mensaje, clasifica (`responder`/`ignorar`/`escalar_humano`), pre-califica y deja un **borrador** en cola humana. Nunca envía ni transfiere solo. |
-| B — CRM | `src/crm_automation.py`, `POST /crm/disposition` | Aplica disposiciones, mueve etapa, genera borrador de WhatsApp, deja audit trail, maneja errores (teléfono faltante, lead inexistente, disposición inválida) con cola de fallos y reintento. |
-| C — Datos y reporting | `src/reporting.py`, `GET /reporting/*` | Limpia `data/leads.csv` + `data/partner_enrollments.csv` (con errores a propósito), calcula funnel, leads estancados y qué rompería comisiones. |
-| D — Contenido | `src/content_system.py`, `GET /content/scripts` | Genera 3 guiones priorizados a partir de `data/content_sources.json`, cada uno trazable a su fuente. |
+| Ejercicio | Código | Qué prueba | En el dashboard |
+|---|---|---|---|
+| A — Pre-calificación + handoff | `src/prequalification_agent.py`, `POST /webhook/lead` | Ingesta un mensaje, clasifica (`responder`/`ignorar`/`escalar_humano`), pre-califica y deja un **borrador** en cola humana. Nunca envía ni transfiere solo. | Formulario "enviar mensaje al agente" + log de decisiones |
+| B — CRM | `src/crm_automation.py`, `POST /crm/disposition` | Aplica disposiciones, mueve etapa, genera borrador de WhatsApp, deja audit trail, maneja errores (teléfono faltante, lead inexistente, disposición inválida) con cola de fallos y reintento. | Tablero por etapa + tabla de cola de fallos |
+| C — Datos y reporting | `src/reporting.py`, `GET /reporting/*` | Limpia `data/leads.csv` + `data/partner_enrollments.csv` (con errores a propósito), calcula funnel, leads estancados y qué rompería comisiones. | Tarjetas de métricas + tablas |
+| D — Contenido | `src/content_system.py`, `GET /content/scripts` | Genera 3 guiones priorizados a partir de `data/content_sources.json`, cada uno trazable a su fuente. | Tarjetas de guiones |
 
 ## Reglas de negocio editables sin tocar código
 

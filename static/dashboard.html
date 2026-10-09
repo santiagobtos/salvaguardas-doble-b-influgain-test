@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Salvaguardas Doble B — Panel de Operación</title>
+<style>
+  :root {
+    --bg: #0f1420;
+    --panel: #161d2e;
+    --panel-2: #1d2740;
+    --border: #2a3350;
+    --text: #e8ecf5;
+    --muted: #9aa5c0;
+    --accent: #5b8cff;
+    --green: #35c48f;
+    --orange: #f0a93a;
+    --red: #f2555a;
+    --gray: #6b7593;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    padding: 24px;
+  }
+  header { margin-bottom: 24px; }
+  header h1 { margin: 0 0 4px; font-size: 22px; }
+  header p { margin: 0; color: var(--muted); font-size: 14px; }
+
+  .toolbar { display: flex; gap: 10px; margin: 16px 0 24px; flex-wrap: wrap; }
+  button {
+    background: var(--accent); color: white; border: none; border-radius: 8px;
+    padding: 9px 16px; font-size: 14px; cursor: pointer; font-weight: 600;
+  }
+  button.secondary { background: var(--panel-2); color: var(--text); border: 1px solid var(--border); }
+  button.small { padding: 5px 10px; font-size: 12px; }
+  button:hover { opacity: 0.9; }
+
+  section {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
+    padding: 18px; margin-bottom: 20px;
+  }
+  section h2 { margin: 0 0 4px; font-size: 16px; }
+  section .subtitle { color: var(--muted); font-size: 12px; margin: 0 0 14px; }
+
+  .grid-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
+  .stat-card { background: var(--panel-2); border: 1px solid var(--border); border-radius: 10px; padding: 12px; }
+  .stat-card .value { font-size: 24px; font-weight: 700; }
+  .stat-card .label { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+  form.lead-form { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+  form.lead-form input, form.lead-form select {
+    background: var(--panel-2); border: 1px solid var(--border); color: var(--text);
+    border-radius: 6px; padding: 8px; font-size: 13px;
+  }
+  form.lead-form .full { grid-column: 1 / -1; }
+
+  .log { max-height: 160px; overflow-y: auto; font-size: 12px; font-family: Consolas, monospace; }
+  .log div { padding: 4px 0; border-bottom: 1px solid var(--border); }
+
+  .badge {
+    display: inline-block; font-size: 11px; font-weight: 700; padding: 2px 8px;
+    border-radius: 999px; text-transform: uppercase;
+  }
+  .badge.responder { background: rgba(53,196,143,.15); color: var(--green); }
+  .badge.escalar_humano { background: rgba(242,85,90,.15); color: var(--red); }
+  .badge.ignorar { background: rgba(107,117,147,.2); color: var(--gray); }
+
+  .kanban { display: grid; grid-template-columns: repeat(6, minmax(190px, 1fr)); gap: 10px; overflow-x: auto; }
+  .kanban-col { background: var(--panel-2); border: 1px solid var(--border); border-radius: 10px; padding: 8px; min-height: 80px; }
+  .kanban-col h3 { font-size: 11px; color: var(--muted); margin: 2px 4px 8px; text-transform: uppercase; }
+  .lead-card {
+    background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
+    padding: 8px; margin-bottom: 8px; font-size: 12px;
+  }
+  .lead-card .lid { font-weight: 700; }
+  .lead-card .meta { color: var(--muted); font-size: 11px; margin: 2px 0 6px; }
+  .lead-card select { width: 100%; font-size: 11px; margin-top: 4px; background: var(--panel-2); color: var(--text); border: 1px solid var(--border); border-radius: 6px; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  table th, table td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border); }
+  table th { color: var(--muted); font-size: 11px; text-transform: uppercase; }
+
+  .content-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
+  .content-card { background: var(--panel-2); border: 1px solid var(--border); border-radius: 10px; padding: 12px; font-size: 12px; white-space: pre-wrap; }
+  .content-card .score { color: var(--accent); font-weight: 700; font-size: 11px; margin-bottom: 6px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Salvaguardas Doble B × Consejería Clara</h1>
+  <p>Panel de operación — prueba técnica Influgain. Escenario 100% ficticio, datos inventados.</p>
+</header>
+
+<div class="toolbar">
+  <button onclick="cargarDemo()">Cargar demo (resetea y siembra leads)</button>
+  <button class="secondary" onclick="refrescarTodo()">Actualizar panel</button>
+</div>
+
+<section>
+  <h2>Ejercicio A — Agente de pre-calificación</h2>
+  <p class="subtitle">Simula un mensaje nuevo entrando por chat. El agente clasifica solo: responder / ignorar / escalar a humano.</p>
+  <form class="lead-form" onsubmit="enviarLead(event)">
+    <input id="f_lead_id" placeholder="lead_id (ej: L500)" required>
+    <input id="f_creador" placeholder="creador (ej: @carla.finanzas)" required>
+    <select id="f_canal"><option>CTWA</option><option>organico</option></select>
+    <input id="f_telefono" placeholder="teléfono (opcional)">
+    <input id="f_mensaje" class="full" placeholder="mensaje del lead..." required>
+    <div class="full"><button type="submit">Enviar mensaje al agente</button></div>
+  </form>
+  <div class="log" id="log"></div>
+</section>
+
+<section>
+  <h2>Ejercicio B — CRM (tablero por etapa)</h2>
+  <p class="subtitle">Cada columna es una etapa. Cambia la disposición de un lead desde su tarjeta.</p>
+  <div class="kanban" id="kanban"></div>
+</section>
+
+<section>
+  <h2>Cola de fallos / reintentos</h2>
+  <p class="subtitle">Errores del CRM (teléfono faltante, lead inexistente, disposición inválida) nunca se pierden en silencio.</p>
+  <div class="toolbar" style="margin:0 0 10px;">
+    <button class="secondary small" onclick="reintentarFallos()">Reintentar pendientes</button>
+  </div>
+  <table id="tabla-fallos"><thead><tr><th>Tipo</th><th>Error</th><th>Reintentos</th><th>Estado</th></tr></thead><tbody></tbody></table>
+</section>
+
+<section>
+  <h2>Ejercicio C — Reporting (sobre data/leads.csv + partner_enrollments.csv)</h2>
+  <p class="subtitle">Dataset histórico fijo, con errores a propósito — separado de la operación en vivo de arriba.</p>
+  <div class="grid-stats" id="stats-funnel"></div>
+  <h3 style="font-size:13px; margin:16px 0 6px;">Leads estancados</h3>
+  <table id="tabla-estancados"><thead><tr><th>Lead</th><th>Creador</th><th>Canal</th><th>Estado inicial</th></tr></thead><tbody></tbody></table>
+  <h3 style="font-size:13px; margin:16px 0 6px;">Qué rompería comisiones</h3>
+  <p id="texto-comisiones" style="font-size:13px; color: var(--muted);"></p>
+</section>
+
+<section>
+  <h2>Ejercicio D — Guiones de contenido priorizados</h2>
+  <div class="content-cards" id="content-cards"></div>
+</section>
+
+<script>
+const API = "";
+
+async function post(url, body) {
+  const res = await fetch(API + url, { method: "POST", headers: {"Content-Type":"application/json"}, body: body ? JSON.stringify(body) : undefined });
+  return res.json();
+}
+async function get(url) {
+  const res = await fetch(API + url);
+  return res.json();
+}
+
+function logLine(texto) {
+  const log = document.getElementById("log");
+  const div = document.createElement("div");
+  div.textContent = texto;
+  log.prepend(div);
+}
+
+async function enviarLead(ev) {
+  ev.preventDefault();
+  const body = {
+    lead_id: document.getElementById("f_lead_id").value,
+    creador: document.getElementById("f_creador").value,
+    canal: document.getElementById("f_canal").value,
+    mensaje: document.getElementById("f_mensaje").value,
+    telefono: document.getElementById("f_telefono").value || null,
+  };
+  const r = await post("/webhook/lead", body);
+  logLine(`[${new Date().toLocaleTimeString()}] ${r.lead_id} -> ${r.decision} (${r.razon})`);
+  document.getElementById("f_mensaje").value = "";
+  cargarKanban();
+}
+
+async function cargarDemo() {
+  await post("/demo/seed");
+  logLine("Demo cargada: 6 leads de ejemplo pasados por el agente + disposiciones aplicadas.");
+  refrescarTodo();
+}
+
+const STAGES = ["Nuevo", "Sin Respuesta", "Info Enviada", "Reintentar Contacto", "Transferido a Consejero", "Cerrado - Sin Interés"];
+const DISPOSICIONES = ["No Answer", "Info Sent", "Transferido", "Call Back", "No le interesa"];
+
+async function cargarKanban() {
+  const leads = await get("/crm/leads");
+  const kanban = document.getElementById("kanban");
+  kanban.innerHTML = "";
+  for (const stage of STAGES) {
+    const col = document.createElement("div");
+    col.className = "kanban-col";
+    const leadsEnStage = leads.filter(l => (l.stage || "Nuevo") === stage);
+    col.innerHTML = `<h3>${stage} (${leadsEnStage.length})</h3>`;
+    for (const lead of leadsEnStage) {
+      const card = document.createElement("div");
+      card.className = "lead-card";
+      card.innerHTML = `
+        <div class="lid">${lead.lead_id} <span class="badge ${lead.estado}">${lead.estado}</span></div>
+        <div class="meta">${lead.creador} · ${lead.canal}</div>
+        <div>${(lead.mensaje || "").slice(0, 60)}...</div>
+        <select onchange="aplicarDisposicion('${lead.lead_id}', this.value)">
+          <option value="">Disposición...</option>
+          ${DISPOSICIONES.map(d => `<option value="${d}">${d}</option>`).join("")}
+        </select>
+      `;
+      col.appendChild(card);
+    }
+    kanban.appendChild(col);
+  }
+}
+
+async function aplicarDisposicion(leadId, disposicion) {
+  if (!disposicion) return;
+  const r = await post("/crm/disposition", { lead_id: leadId, disposicion });
+  logLine(`[${new Date().toLocaleTimeString()}] ${leadId}: disposición "${disposicion}" -> ${r.status}`);
+  cargarKanban();
+  cargarFallos();
+}
+
+async function cargarFallos() {
+  const fallos = await get("/crm/failed-queue");
+  const tbody = document.querySelector("#tabla-fallos tbody");
+  tbody.innerHTML = fallos.map(f => `<tr><td>${f.tipo}</td><td>${f.error}</td><td>${f.retry_count}</td><td>${f.status}</td></tr>`).join("") || "<tr><td colspan='4' style='color:var(--muted)'>Sin fallos pendientes</td></tr>";
+}
+
+async function reintentarFallos() {
+  await post("/crm/failed-queue/retry");
+  cargarFallos();
+}
+
+async function cargarReporting() {
+  const funnel = await get("/reporting/funnel");
+  const g = funnel.general;
+  document.getElementById("stats-funnel").innerHTML = `
+    <div class="stat-card"><div class="value">${g.leads_totales}</div><div class="label">Leads totales</div></div>
+    <div class="stat-card"><div class="value">${g.pre_calificados}</div><div class="label">Pre-calificados</div></div>
+    <div class="stat-card"><div class="value">${g.transferidos}</div><div class="label">Transferidos</div></div>
+    <div class="stat-card"><div class="value">${g.inscritos_activos}</div><div class="label">Inscritos activos</div></div>
+    <div class="stat-card"><div class="value">${g.tasa_transferencia_pct}%</div><div class="label">Tasa de transferencia</div></div>
+    <div class="stat-card"><div class="value">${g.tasa_inscripcion_pct}%</div><div class="label">Tasa de inscripción</div></div>
+  `;
+
+  const estancados = await get("/reporting/stalled-leads");
+  document.querySelector("#tabla-estancados tbody").innerHTML = estancados.map(l =>
+    `<tr><td>${l.lead_id}</td><td>${l.creador}</td><td>${l.canal}</td><td>${l.estado_inicial}</td></tr>`
+  ).join("") || "<tr><td colspan='4' style='color:var(--muted)'>Ninguno</td></tr>";
+
+  const comisiones = await get("/reporting/commission-breaks");
+  document.getElementById("texto-comisiones").textContent =
+    `${comisiones.resumen} (sin creator_id: ${comisiones.inscripciones_sin_creator_id}, teléfono mismatch: ${comisiones.inscripciones_con_telefono_mismatch})`;
+}
+
+async function cargarContenido() {
+  const guiones = await get("/content/scripts?top_n=3");
+  document.getElementById("content-cards").innerHTML = guiones.map(g =>
+    `<div class="content-card"><div class="score">Fuente ${g.fuente_id} · score ${g.prioridad_score} · ${g.duracion_estimada_seg}s</div>${g.guion}</div>`
+  ).join("");
+}
+
+function refrescarTodo() {
+  cargarKanban();
+  cargarFallos();
+  cargarReporting();
+  cargarContenido();
+}
+
+refrescarTodo();
+</script>
+</body>
+</html>
