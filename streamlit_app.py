@@ -7,6 +7,7 @@ content_system). Esta es solo la capa de interfaz.
 Correr: streamlit run streamlit_app.py
 """
 import random
+import time
 from datetime import datetime, timezone
 
 import pandas as pd
@@ -23,32 +24,39 @@ st.set_page_config(
 )
 
 # ---------------------------------------------------------------- estilos --
+# Paleta inspirada en el sitio de Notion: blanco, negro audaz, azul como
+# único acento — nada de paletas cálidas "editoriales" ni serif.
 st.markdown(
     """
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,420;0,9..144,650;1,9..144,500&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
 :root {
-  --brand:#2f5d50; --brand-dark:#1f453b; --brand-tint:#e5ede8;
-  --clay:#b2553a; --clay-tint:#f4e3da; --gold:#a9802f; --gold-tint:#f3ead1;
-  --ink:#2b2620; --ink-soft:#554f44; --ink-muted:#8a8272; --border:#e6ddc9;
+  --brand:#2563eb; --brand-dark:#1d4ed8; --brand-tint:#eaf1fe;
+  --amber:#b45309; --amber-tint:#fef3dc; --gray-tint:#f1f2f4;
+  --ink:#111317; --ink-soft:#44464c; --ink-muted:#80838a; --border:#e7e8eb;
 }
 html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
-h1, h2, h3 { font-family: 'Fraunces', Georgia, serif !important; color: var(--ink); letter-spacing: -.01em; }
-.stApp { background: #f6f2ea; }
+h1, h2, h3 { font-family: 'Inter', sans-serif !important; font-weight: 800 !important; color: var(--ink); letter-spacing: -.02em; }
+.stApp { background: #ffffff; }
 .eyebrow { font-size: 11.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--brand); font-weight: 700; margin-bottom: 2px; }
 .lede { font-size: 15px; color: var(--ink-soft); max-width: 70ch; }
 .badge { display:inline-block; font-size:10.5px; font-weight:700; text-transform:uppercase; padding:2px 9px; border-radius:999px; margin-left:6px;}
 .badge.responder { background: var(--brand-tint); color: var(--brand-dark); }
-.badge.escalar_humano { background: var(--clay-tint); color: var(--clay); }
-.badge.ignorar { background: #ece8df; color: var(--ink-muted); }
-.chat-bubble { background:#fffdf9; border:1px solid var(--border); border-radius:12px 12px 12px 3px; padding:10px 14px; font-size:13px; margin:8px 0; max-width:85%; }
-.chat-bubble.draft { background: var(--brand-tint); border-color:#cfe0d7; border-radius:12px 12px 3px 12px; margin-left:auto; color: var(--brand-dark); }
+.badge.escalar_humano { background: var(--amber-tint); color: var(--amber); }
+.badge.ignorar { background: var(--gray-tint); color: var(--ink-muted); }
+.chat-bubble { background:#fff; border:1px solid var(--border); border-radius:12px 12px 12px 3px; padding:10px 14px; font-size:13px; margin:8px 0; max-width:85%; }
+.chat-bubble.draft { background: var(--brand-tint); border-color:#d7e4fc; border-radius:12px 12px 3px 12px; margin-left:auto; color: var(--brand-dark); }
 .chat-bubble .stamp { font-size:9.5px; text-transform:uppercase; letter-spacing:.04em; opacity:.7; display:block; margin-bottom:3px; }
-.script-card { background:#fffdf9; border:1px solid var(--border); border-radius:14px; overflow:hidden; margin-bottom:12px; }
+.script-card { background:#fff; border:1px solid var(--border); border-radius:14px; overflow:hidden; margin-bottom:12px; }
 .script-card .strip { background: var(--brand-tint); color: var(--brand-dark); font-size:11px; font-weight:700; padding:8px 14px; display:flex; justify-content:space-between; }
 .script-card .body { padding:14px; font-size:12.8px; color: var(--ink-soft); white-space:pre-wrap; line-height:1.55; }
-.callout { background: var(--gold-tint); border:1px solid #e6d3a3; border-left:3px solid var(--gold); border-radius:10px; padding:16px 18px; font-size:13.3px; color:#5c4620; }
+.callout { background: var(--amber-tint); border:1px solid #f3dca8; border-left:3px solid var(--amber); border-radius:10px; padding:16px 18px; font-size:13.3px; color:#6b4414; }
+.lead-card { background:#fff; border:1px solid var(--border); border-radius:14px; padding:20px 22px; margin-top:4px; }
+.lead-card h4 { margin:0 0 4px; font-size:17px; font-weight:800; }
+.lead-card .meta { color: var(--ink-muted); font-size:12.5px; margin-bottom:12px; }
+.lead-card .field-label { font-size:10.5px; text-transform:uppercase; letter-spacing:.05em; color: var(--ink-muted); font-weight:700; margin-top:14px; }
+.lead-card .field-value { font-size:14px; color: var(--ink); margin-top:2px; }
 </style>
 """,
     unsafe_allow_html=True,
@@ -56,34 +64,181 @@ h1, h2, h3 { font-family: 'Fraunces', Georgia, serif !important; color: var(--in
 
 db.init_db()
 
+if "primera_carga_hecha" not in st.session_state:
+    st.session_state["primera_carga_hecha"] = bool(db.listar_leads())
+if "lead_counter" not in st.session_state:
+    existentes = db.listar_leads()
+    nums = [int(l["lead_id"][1:]) for l in existentes if l["lead_id"].startswith("N") and l["lead_id"][1:].isdigit()]
+    st.session_state["lead_counter"] = (max(nums) + 1) if nums else 1
+st.session_state.setdefault("auto_gen_activo", False)
+st.session_state.setdefault("ultimo_auto_gen_ts", 0.0)
+
 # --------------------------------------------------------- datos iniciales --
-SEED_POOL = [
-    ("@carla.finanzas", "CTWA", "Hola, tengo una deuda de tarjeta de credito de 3200000 y no se que hacer", "300100000{n}"),
-    ("@juanfi_libre", "organico", "Buenas, debo libranza por 11000000, quiero informacion del programa", "300100001{n}"),
-    ("@manu.deudas", "CTWA", "Me interesa el programa, tengo una deuda hipotecaria de 38000000", "300100002{n}"),
-    ("@laura_consejos", "organico", "Hola vi el video, debo como 2600000 en tarjeta, quiero hablar con un consejero", "300100003{n}"),
-    ("@pedro.ahorra", "CTWA", "Buenas tardes, tengo varias deudas y no sé por dónde empezar, suman 17000000", "300100004{n}"),
-    ("@carla.finanzas", "organico", "Hola quiero asesoria para mi libranza de nomina de 8700000", "300100005{n}"),
-    ("@manu.deudas", "CTWA", "Me llego una demanda por mi tarjeta de credito, que hago", "300100006{n}"),
-    ("@juanfi_libre", "organico", "Un abogado me contacto por el embargo de mi cuenta, estoy preocupado", "300100007{n}"),
-    ("@pedro.ahorra", "CTWA", "No me interesa, quitame de esta lista por favor", "300100008{n}"),
-    ("@laura_consejos", "organico", "Stop, no quiero recibir mas mensajes", "300100009{n}"),
-    ("@carla.finanzas", "CTWA", "Hola, quiero mas informacion sobre el programa", "300100010{n}"),
-    ("@manu.deudas", "organico", "Buenas, como funciona la consejeria de ustedes", "300100011{n}"),
+# Carga por defecto: un set curado y reconocible (no aleatorio) para la
+# primera carga, mezclando los 3 caminos de clasificación.
+CARGA_DEFECTO = [
+    ("@carla.finanzas", "CTWA", "Hola, tengo una deuda de tarjeta de credito de 3200000 y no se que hacer", "3001000001"),
+    ("@juanfi_libre", "organico", "Buenas, debo libranza por 11000000, quiero informacion del programa", "3001000002"),
+    ("@manu.deudas", "CTWA", "Me interesa el programa, tengo una deuda hipotecaria de 38000000", "3001000003"),
+    ("@laura_consejos", "organico", "Hola vi el video, debo como 2600000 en tarjeta, quiero hablar con un consejero", "3001000004"),
+    ("@pedro.ahorra", "CTWA", "Buenas tardes, tengo varias deudas y no sé por dónde empezar, suman 17000000", "3001000005"),
+    ("@carla.finanzas", "organico", "Hola quiero asesoria para mi libranza de nomina de 8700000", "3001000006"),
+    ("@manu.deudas", "CTWA", "Me llego una demanda por mi tarjeta de credito, que hago", "3001000007"),
+    ("@juanfi_libre", "organico", "Un abogado me contacto por el embargo de mi cuenta, estoy preocupado", "3001000008"),
+    ("@pedro.ahorra", "CTWA", "No me interesa, quitame de esta lista por favor", "3001000009"),
+    ("@laura_consejos", "organico", "Stop, no quiero recibir mas mensajes", "3001000010"),
+    ("@carla.finanzas", "CTWA", "Hola, quiero mas informacion sobre el programa", "3001000011"),
+    ("@manu.deudas", "organico", "Buenas, como funciona la consejeria de ustedes", "3001000012"),
 ]
 
+# Pool para la generación automática — plantillas parecidas a mensajes
+# reales, combinadas con montos, creadores y teléfonos aleatorios en cada
+# generación para que ningún lead se repita igual.
+CREADORES_POOL = [
+    "@carla.finanzas", "@juanfi_libre", "@manu.deudas", "@laura_consejos",
+    "@pedro.ahorra", "@sofia.claridad", "@andres.deudafree", "@valen.consejos",
+]
+MENSAJES_POOL = [
+    "Hola, tengo una deuda de tarjeta de credito de {monto} y no se que hacer",
+    "Buenas, debo libranza por {monto}, quiero informacion del programa",
+    "Me interesa el programa, tengo una deuda hipotecaria de {monto}",
+    "Hola vi el video, debo como {monto} en tarjeta, quiero hablar con un consejero",
+    "Buenas tardes, tengo varias deudas y no sé por dónde empezar, suman {monto}",
+    "Hola quiero asesoria para mi libranza de nomina de {monto}",
+    "Vi el reel de ustedes, tengo deudas de consumo por {monto}, me pueden ayudar?",
+    "Hola, quiero saber si me pueden ayudar con mi credito de {monto}",
+    "Buenas, una amiga me recomendo escribirles, debo {monto} en tarjetas",
+    "Me llego una demanda por mi tarjeta de credito, que hago",
+    "Un abogado me contacto por el embargo de mi cuenta, estoy muy preocupado",
+    "Esto es urgente, me amenazan con quitarme la casa",
+    "Quiero denunciar un fraude con mi tarjeta",
+    "La empresa esta en quiebra y no se que hacer con mis deudas",
+    "No me interesa, quitame de esta lista por favor",
+    "Stop, no quiero recibir mas mensajes",
+    "Dejen de escribirme, es spam",
+    "Hola, quiero mas informacion sobre el programa",
+    "Buenas, como funciona la consejeria de ustedes",
+    "Hola vi el anuncio, me pueden contar mas",
+]
+MONTOS_POOL = [1800000, 2600000, 3200000, 4100000, 5600000, 7300000, 9000000, 11500000, 15000000, 22000000, 38000000]
 
-def seed_inicial(n=18):
-    if db.listar_leads():
+
+def _telefono_aleatorio():
+    return "3" + "".join(str(random.randint(0, 9)) for _ in range(9))
+
+
+def generar_lead_aleatorio(lead_id):
+    plantilla = random.choice(MENSAJES_POOL)
+    mensaje = plantilla.format(monto=random.choice(MONTOS_POOL)) if "{monto}" in plantilla else plantilla
+    creador = random.choice(CREADORES_POOL)
+    canal = random.choices(["CTWA", "organico"], weights=[60, 40])[0]
+    return {"lead_id": lead_id, "creador": creador, "canal": canal, "mensaje": mensaje, "telefono": _telefono_aleatorio()}
+
+
+def siguiente_lead_id():
+    st.session_state.setdefault("lead_counter", 1)
+    lead_id = f"N{st.session_state.lead_counter:04d}"
+    st.session_state.lead_counter += 1
+    return lead_id
+
+
+def ingresar_lead(creador, canal, mensaje, telefono, lead_id=None):
+    lead_id = lead_id or siguiente_lead_id()
+    return procesar_mensaje_entrante(lead_id, creador, canal, mensaje, telefono)
+
+
+def resetear_operacion_en_vivo():
+    db.reset_db()
+    for key in ("primera_carga_hecha", "auto_gen_activo", "lead_counter", "lead_seleccionado"):
+        st.session_state.pop(key, None)
+
+
+@st.fragment(run_every="5s")
+def stack_fragment():
+    """Tabla en vivo + generación automática.
+
+    El fragmento se re-evalúa cada 5s para que la tabla se sienta viva, pero
+    un lead nuevo solo se genera si de verdad pasaron >=30s reales desde el
+    último (gate por reloj, con st.session_state["ultimo_auto_gen_ts"]).
+    Importante: NO se llama a st.rerun() de alcance completo aquí — eso
+    destruye y vuelve a montar el fragmento en cada ciclo, lo que rompe el
+    intervalo real y puede generar leads en bucle sin control.
+    """
+    if st.session_state.get("auto_gen_activo"):
+        ahora = time.time()
+        if ahora - st.session_state.get("ultimo_auto_gen_ts", 0.0) >= 30:
+            lead = generar_lead_aleatorio(siguiente_lead_id())
+            ingresar_lead(lead["creador"], lead["canal"], lead["mensaje"], lead["telefono"], lead_id=lead["lead_id"])
+            st.session_state["ultimo_auto_gen_ts"] = ahora
+            st.toast(f"📥 Nuevo lead automático: {lead['lead_id']}")
+
+    leads_actuales = db.listar_leads()
+    st.markdown(f"#### Stack de leads &nbsp;·&nbsp; {len(leads_actuales)} en total")
+    st.caption("Haz clic en una fila para ver el lead a detalle.")
+
+    if not leads_actuales:
+        st.info("Sin leads todavía.")
         return
-    for i in range(n):
-        creador, canal, mensaje, tel_tpl = SEED_POOL[i % len(SEED_POOL)]
-        lead_id = f"P{i+1:03d}"
-        telefono = tel_tpl.format(n=i % 10)
-        procesar_mensaje_entrante(lead_id, creador, canal, mensaje, telefono)
 
+    df_stack = pd.DataFrame(leads_actuales).sort_values("timestamp", ascending=False)
+    df_view = df_stack[["lead_id", "timestamp", "creador", "canal", "mensaje", "estado"]].rename(columns={
+        "lead_id": "ID", "timestamp": "Llegó", "creador": "Creador", "canal": "Canal",
+        "mensaje": "Mensaje", "estado": "Decisión",
+    })
 
-seed_inicial()
+    evento = st.dataframe(
+        df_view,
+        use_container_width=True,
+        hide_index=True,
+        height=360,
+        on_select="rerun",
+        selection_mode="single-row",
+        key="stack_leads_tabla",
+        column_config={"Mensaje": st.column_config.TextColumn(width="large")},
+    )
+
+    filas_sel = evento.selection["rows"] if evento and evento.selection else []
+    if not filas_sel:
+        return
+
+    lead_id_sel = df_view.iloc[filas_sel[0]]["ID"]
+    lead_detalle = db.get_lead(lead_id_sel)
+    decisiones_lead = [d for d in db.listar_decisiones() if d["lead_id"] == lead_id_sel]
+    drafts_lead = [d for d in db.listar_drafts() if d["lead_id"] == lead_id_sel]
+    ultima_decision = decisiones_lead[-1] if decisiones_lead else None
+    ultimo_draft = drafts_lead[-1] if drafts_lead else None
+
+    badge = lead_detalle["estado"]
+    detalle_html = f"""
+    <div class="lead-card">
+      <h4>{lead_detalle['lead_id']} <span class="badge {badge}">{badge.replace('_',' ')}</span></h4>
+      <div class="meta">{lead_detalle['creador']} · {lead_detalle['canal']} · {lead_detalle.get('telefono') or 'sin teléfono'} · llegó {lead_detalle['timestamp']}</div>
+      <div class="field-label">Mensaje</div>
+      <div class="field-value">{lead_detalle['mensaje']}</div>
+    """
+    if ultima_decision:
+        detalle_html += f"""
+      <div class="field-label">Por qué el sistema decidió esto</div>
+      <div class="field-value">{ultima_decision['razon']}</div>
+        """
+    if lead_detalle.get("monto_deuda") or lead_detalle.get("tipo_deuda"):
+        detalle_html += f"""
+      <div class="field-label">Pre-calificación</div>
+      <div class="field-value">Monto: {lead_detalle.get('monto_deuda') or '—'} · Tipo de deuda: {lead_detalle.get('tipo_deuda') or '—'} · Interés en Consejero: {'sí' if lead_detalle.get('interes_consejero') else 'no'}</div>
+        """
+    detalle_html += f"""
+      <div class="field-label">Etapa actual en el CRM</div>
+      <div class="field-value">{lead_detalle['stage']}</div>
+    </div>
+    """
+    st.markdown(detalle_html, unsafe_allow_html=True)
+
+    if ultimo_draft:
+        st.markdown(
+            f'<div class="chat-bubble draft"><span class="stamp">Borrador generado · {ultimo_draft["status"]}</span>{ultimo_draft["contenido"]}</div>',
+            unsafe_allow_html=True,
+        )
+
 
 # ------------------------------------------------------------------ header --
 with st.sidebar:
@@ -96,8 +251,7 @@ with st.sidebar:
     )
     st.markdown("---")
     if st.button("🔄 Reiniciar panel (resetea leads en vivo)", use_container_width=True):
-        db.reset_db()
-        seed_inicial()
+        resetear_operacion_en_vivo()
         st.rerun()
     st.caption("Esto reinicia solo la operación en vivo (pestañas A y B). Los datos del Ejercicio C viven en data/.")
 
@@ -111,7 +265,7 @@ st.markdown(
 )
 
 tab_inicio, tab_a, tab_b, tab_c, tab_d = st.tabs(
-    ["🏠 Inicio", "A · Pre-calificación", "B · CRM y disposiciones", "C · Datos y reporting", "D · Contenido"]
+    ["🏠 Inicio", "Leads que llegan", "B · CRM y disposiciones", "C · Datos y reporting", "D · Contenido"]
 )
 
 # ======================================================================= #
@@ -133,8 +287,8 @@ with tab_inicio:
     st.subheader("Qué hace cada pestaña")
     cc1, cc2, cc3, cc4 = st.columns(4)
     with cc1:
-        st.markdown("**A · Pre-calificación**")
-        st.caption("30% — El agente clasifica cada mensaje nuevo solo: responder, ignorar o escalar a un humano.")
+        st.markdown("**Leads que llegan (A)**")
+        st.caption("30% — Ingesta y clasifica cada mensaje nuevo solo: responder, ignorar o escalar a un humano.")
     with cc2:
         st.markdown("**B · CRM y disposiciones**")
         st.caption("30% — Aplica disposiciones, mueve etapas, genera borradores de WhatsApp y maneja fallos.")
@@ -151,54 +305,66 @@ with tab_inicio:
     )
 
 # ======================================================================= #
-# EJERCICIO A                                                              #
+# LEADS QUE LLEGAN (EJERCICIO A)                                           #
 # ======================================================================= #
 with tab_a:
     st.markdown('<span class="eyebrow">Ejercicio A · 30%</span>', unsafe_allow_html=True)
-    st.header("El primer mensaje nunca espera a que alguien se despierte")
+    st.header("Leads que llegan")
     st.markdown(
-        '<p class="lede">Un lead escribe a las 11:47pm. El equipo humano está dormido. '
-        "En segundos, el sistema toma uno de tres caminos — y deja un rastro claro de por qué.</p>",
+        '<p class="lede">Cada fila es un mensaje que acaba de entrar por chat. En cuanto llega, '
+        "pasa directo a procesamiento: el sistema lo clasifica solo, sin que nadie lo toque.</p>",
         unsafe_allow_html=True,
     )
 
-    p1, p2, p3 = st.columns(3)
-    p1.success("**Responder** — dentro de las reglas estándar: pre-califica y deja un borrador en cola humana. Nunca lo envía solo.")
-    p2.warning("**Escalar a humano** — palabra de riesgo o monto fuera de rango: se registra el motivo, espera a una persona.")
-    p3.info("**Ignorar** — el lead pide salir de la lista: se registra, no se le vuelve a escribir.")
+    if not st.session_state["primera_carga_hecha"]:
+        # ---- Estado inicial: todavía no se ha hecho la primera carga ----
+        st.markdown("#### Primera carga")
+        st.caption("Antes de que el panel empiece a recibir leads, cárgalo con un set inicial.")
+        if st.button("📥 Cargar leads por defecto", type="primary"):
+            for i, (creador, canal, mensaje, telefono) in enumerate(CARGA_DEFECTO, start=1):
+                ingresar_lead(creador, canal, mensaje, telefono, lead_id=f"P{i:03d}")
+            st.session_state["primera_carga_hecha"] = True
+            st.rerun()
 
-    st.markdown("### Simular un mensaje entrante")
-    with st.form("form_lead", clear_on_submit=True):
-        fc1, fc2, fc3 = st.columns(3)
-        lead_id = fc1.text_input("lead_id", placeholder="L500")
-        creador = fc2.text_input("creador", placeholder="@carla.finanzas")
-        canal = fc3.selectbox("canal", ["CTWA", "organico"])
-        telefono = st.text_input("teléfono (opcional)", placeholder="3001234567")
-        mensaje = st.text_area("mensaje del lead", placeholder="Escribe el mensaje, como si fuera un chat real...")
-        enviado = st.form_submit_button("Enviar al agente", type="primary")
+        with st.expander("➕ O añade un lead manualmente para empezar"):
+            with st.form("form_lead_inicial", clear_on_submit=True):
+                fc1, fc2, fc3 = st.columns(3)
+                creador = fc1.text_input("creador", placeholder="@carla.finanzas")
+                canal = fc2.selectbox("canal", ["CTWA", "organico"])
+                telefono = fc3.text_input("teléfono (opcional)", placeholder="3001234567")
+                mensaje = st.text_area("mensaje del lead", placeholder="Escribe el mensaje, como si fuera un chat real...")
+                enviado = st.form_submit_button("Añadir e iniciar", type="primary")
+            if enviado and creador and mensaje:
+                ingresar_lead(creador, canal, mensaje, telefono or None)
+                st.session_state["primera_carga_hecha"] = True
+                st.rerun()
 
-    if enviado and lead_id and creador and mensaje:
-        r = procesar_mensaje_entrante(lead_id, creador, canal, mensaje, telefono or None)
-        badge = r["decision"]
-        st.markdown(
-            f'<div class="chat-bubble">{mensaje}</div>'
-            f'<span class="badge {badge}">{badge.replace("_"," ")}</span> &nbsp; <small>{r["razon"]}</small>',
-            unsafe_allow_html=True,
-        )
-        if r["draft_id"]:
-            st.markdown(
-                '<div class="chat-bubble draft"><span class="stamp">Borrador · pendiente de revisión</span>'
-                "Se dejó una respuesta lista para que un humano la apruebe.</div>",
-                unsafe_allow_html=True,
-            )
-
-    st.markdown("### Historial de decisiones")
-    decisiones = db.listar_decisiones()
-    if decisiones:
-        df_dec = pd.DataFrame(decisiones).sort_values("id", ascending=False)
-        st.dataframe(df_dec[["timestamp", "lead_id", "decision", "razon", "draft_id"]], use_container_width=True, hide_index=True)
     else:
-        st.caption("Aún no hay decisiones registradas.")
+        # ---- Ya hubo primera carga: controles de operación en vivo ----
+        ctrl1, ctrl2 = st.columns([2, 1])
+        with ctrl1:
+            activo = st.toggle(
+                "🔁 Generar un lead nuevo cada 30 segundos (totalmente aleatorio)",
+                key="auto_gen_activo",
+            )
+            if activo:
+                st.caption("Activo — cada 30s entra un lead nuevo del pool y pasa directo a procesamiento. No necesitas hacer nada.")
+            else:
+                st.caption("Apagado — actívalo para que el panel reciba leads solo, como lo haría un webhook real.")
+        with ctrl2:
+            with st.popover("➕ Añadir lead manual"):
+                with st.form("form_lead_manual", clear_on_submit=True):
+                    creador = st.text_input("creador", placeholder="@carla.finanzas")
+                    canal = st.selectbox("canal", ["CTWA", "organico"])
+                    telefono = st.text_input("teléfono (opcional)", placeholder="3001234567")
+                    mensaje = st.text_area("mensaje", placeholder="Mensaje del lead...")
+                    enviado = st.form_submit_button("Añadir al stack", type="primary")
+                if enviado and creador and mensaje:
+                    ingresar_lead(creador, canal, mensaje, telefono or None)
+                    st.rerun()
+
+        st.markdown("---")
+        stack_fragment()
 
 # ======================================================================= #
 # EJERCICIO B — MÓDULO 1                                                   #
@@ -214,7 +380,7 @@ with tab_b:
 
     leads = db.listar_leads()
     if not leads:
-        st.info("No hay leads todavía — usa 'Reiniciar panel' en la barra lateral.")
+        st.info("No hay leads todavía — ve a la pestaña 'Leads que llegan' para hacer la primera carga.")
     else:
         df = pd.DataFrame(leads)[["lead_id", "timestamp", "creador", "canal", "mensaje", "telefono", "estado", "stage"]]
         df = df.rename(columns={
