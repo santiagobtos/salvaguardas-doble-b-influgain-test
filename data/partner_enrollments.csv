@@ -1,6 +1,6 @@
 enrollment_id,lead_id,creator_id,telefono,fecha_inscripcion,monto_pactado,status
-E001,L020,@pedro.ahorra,3000000998,2026-10-07,1200000,Cancelado
-E002,L036,@juanfi_libre,3000000997,2026-10-04,1200000,Cancelado
+E001,L020,@pedro.ahorra,30011XX22,2026-10-07,1200000,Cancelado
+E002,L036,@juanfi_libre,30112,2026-10-04,1200000,Cancelado
 E003,L009,@laura_consejos,3000000996,2026-10-05,0,Cancelado
 E004,L025,@laura_consejos,3000000995,2026-10-05,0,Pendiente
 E005,L042,@juanfi_libre,3000000042,31/02/2026,500000,Cancelado
@@ -15,7 +15,7 @@ E013,L024,@laura_consejos,3000000024,2026-10-09,1200000,Pendiente
 E014,L013,,3000000013,2026-10-06,500000,Cancelado
 E015,L037,@carla.finanzas,3000000037,2026-10-03,3000000,Activo
 E016,L034,@juanfi_libre,3000000034,2026-10-02,1200000,Activo
-E017,L031,@juanfi_libre,3000000031,2026-10-08,500000,Pendiente
+E017,L031,@juanfi_libre,3000000031,2026-10-09,500000,Pendiente
 E018,L042,@manu.deudas,3000000042,2026-10-05,1200000,Pendiente
 E019,L032,,3000000032,2026-10-01,8000000,Pendiente
 E020,L005,@carla.finanzas,3000000005,2026-10-08,500000,Cancelado
@@ -26,4 +26,4 @@ E024,L039,@carla.finanzas,3000000039,2026-10-03,8000000,Cancelado
 E025,L013,,3000000013,2026-09-29,1200000,Pendiente
 E026,L013,@carla.finanzas,3000000013,2026-09-29,8000000,Pendiente
 E027,L013,,3000000013,2026-10-07,1200000,Cancelado
-E001,L020,@pedro.ahorra,3000000998,2026-10-07,1200000,Cancelado
+E001,L020,@pedro.ahorra,30011XX22,2026-10-07,1200000,Cancelado

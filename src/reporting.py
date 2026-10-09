@@ -29,8 +29,39 @@ def _normalizar_telefono(telefono):
     return digitos[-10:] if len(digitos) >= 10 else (digitos or None)
 
 
-def cargar_y_limpiar():
-    """Carga los 2 CSV y aplica limpieza documentada.
+def cargar_enrollments_crudo():
+    """Lee partner_enrollments.csv tal cual viene, sin limpiar. Para la vista "datos sucios"."""
+    return pd.read_csv(DATA_DIR / "partner_enrollments.csv", dtype=str)
+
+
+def detectar_problemas(enroll_raw):
+    """Para cada fila del CSV crudo, marca qué columnas tienen un error conocido.
+
+    Devuelve un DataFrame booleano con las mismas filas y columnas
+    [creator_id, telefono, fecha_inscripcion, enrollment_id] listo para
+    resaltar en la interfaz.
+    """
+    problemas = pd.DataFrame(False, index=enroll_raw.index, columns=enroll_raw.columns)
+
+    creator_vacio = enroll_raw["creator_id"].isna() | (enroll_raw["creator_id"].str.strip() == "")
+    problemas["creator_id"] = creator_vacio
+
+    telefono_valido = enroll_raw["telefono"].str.fullmatch(r"\d{10}", na=False)
+    problemas["telefono"] = ~telefono_valido
+
+    fecha_valida = pd.to_datetime(enroll_raw["fecha_inscripcion"], errors="coerce").notna()
+    problemas["fecha_inscripcion"] = ~fecha_valida
+
+    problemas["enrollment_id"] = enroll_raw["enrollment_id"].duplicated(keep=False)
+
+    return problemas
+
+
+def cargar_y_limpiar(enroll_df=None):
+    """Carga leads.csv + inscripciones (fixture o uno pasado por parámetro) y limpia.
+
+    `enroll_df` permite pasar un DataFrame ya leído (ej. un CSV subido por el
+    usuario en la interfaz) en vez del fixture bundleado en data/.
 
     Devuelve (leads_df, enrollments_df, notas_limpieza: list[str]).
     """
@@ -45,7 +76,7 @@ def cargar_y_limpiar():
     if len(leads) < antes:
         notas.append(f"Se eliminaron {antes - len(leads)} leads duplicados por lead_id.")
 
-    enroll = pd.read_csv(DATA_DIR / "partner_enrollments.csv", dtype=str)
+    enroll = enroll_df.copy() if enroll_df is not None else cargar_enrollments_crudo()
 
     vacios_creator = enroll["creator_id"].isna() | (enroll["creator_id"].str.strip() == "")
     if vacios_creator.any():

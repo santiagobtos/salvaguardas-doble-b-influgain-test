@@ -115,9 +115,14 @@ def generar_enrollments(leads, n=27):
         creator_id = random.choice(creators)
 
         telefono = lead["telefono"]
-        # Filas 1-4: teléfono mal capturado a propósito (mismatch garantizado,
-        # no solo probable, para que el Ejercicio C siempre tenga qué detectar).
-        if i <= 4:
+        # Filas 1-2: teléfono con formato inválido a propósito (letras / incompleto).
+        if i == 1:
+            telefono = "30011XX22"
+        elif i == 2:
+            telefono = "30112"
+        # Filas 3-4: teléfono con formato válido pero que no coincide con el lead
+        # (mismatch, un error distinto: captura de otro número real).
+        elif i <= 4:
             telefono = _telefono_falso(999 - i)
 
         fecha = _fecha_aleatoria(dias_atras_max=10).strftime("%Y-%m-%d")

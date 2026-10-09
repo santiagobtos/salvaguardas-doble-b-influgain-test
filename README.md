@@ -28,26 +28,32 @@ pytest
 # 4. Correr la demo completa (Ejercicios A -> B -> C -> D en consola)
 python cli.py demo
 
-# 5. Levantar la API + el dashboard visual
-uvicorn webhook_server:app --reload
-# Dashboard:        http://127.0.0.1:8000/
-# Docs de la API:   http://127.0.0.1:8000/docs
+# 5. Levantar el panel operativo (interfaz principal para la demo/video)
+streamlit run streamlit_app.py
+# Panel: http://localhost:8501
 ```
 
-En el dashboard, el botón **"Cargar demo"** resetea la base y pasa 6 leads de
-ejemplo por el agente real (no son datos falseados en la UI), dejando el
-tablero de CRM poblado en distintas etapas para grabar el video. Desde ahí
-puedes además mandar un mensaje nuevo, cambiar disposiciones y ver el efecto
-en vivo.
+Al abrir el panel se siembran automáticamente ~18 leads pasados por el
+agente real (no son datos falseados en la UI), así la pestaña de CRM no
+empieza vacía. Desde ahí puedes mandar un mensaje nuevo, aplicar
+disposiciones directamente en la tabla, subir tu propio CSV de
+inscripciones, y ver el efecto de cada acción en vivo. El botón **"Reiniciar
+panel"** en la barra lateral resetea la operación en vivo (A y B) sin tocar
+los datos fijos del Ejercicio C.
+
+También existe una API HTTP equivalente (`uvicorn webhook_server:app
+--reload`, documentada en `/docs`) por si se necesita integrar por webhook en
+vez de interfaz — ver [`webhook_server.py`](webhook_server.py). El panel de
+Streamlit es la interfaz pensada para la demo/video.
 
 ## Qué hace cada pieza
 
-| Ejercicio | Código | Qué prueba | En el dashboard |
+| Ejercicio | Código | Qué prueba | En el panel |
 |---|---|---|---|
-| A — Pre-calificación + handoff | `src/prequalification_agent.py`, `POST /webhook/lead` | Ingesta un mensaje, clasifica (`responder`/`ignorar`/`escalar_humano`), pre-califica y deja un **borrador** en cola humana. Nunca envía ni transfiere solo. | Formulario "enviar mensaje al agente" + log de decisiones |
-| B — CRM | `src/crm_automation.py`, `POST /crm/disposition` | Aplica disposiciones, mueve etapa, genera borrador de WhatsApp, deja audit trail, maneja errores (teléfono faltante, lead inexistente, disposición inválida) con cola de fallos y reintento. | Tablero por etapa + tabla de cola de fallos |
-| C — Datos y reporting | `src/reporting.py`, `GET /reporting/*` | Limpia `data/leads.csv` + `data/partner_enrollments.csv` (con errores a propósito), calcula funnel, leads estancados y qué rompería comisiones. | Tarjetas de métricas + tablas |
-| D — Contenido | `src/content_system.py`, `GET /content/scripts` | Genera 3 guiones priorizados a partir de `data/content_sources.json`, cada uno trazable a su fuente. | Tarjetas de guiones |
+| A — Pre-calificación + handoff | `src/prequalification_agent.py` | Ingesta un mensaje, clasifica (`responder`/`ignorar`/`escalar_humano`), pre-califica y deja un **borrador** en cola humana. Nunca envía ni transfiere solo. | Pestaña "A · Pre-calificación": formulario + historial de decisiones |
+| B — CRM | `src/crm_automation.py` | Aplica disposiciones, mueve etapa, genera borrador de WhatsApp, deja audit trail, maneja errores (teléfono faltante, lead inexistente, disposición inválida) con cola de fallos y reintento. | Pestaña "B · CRM": tabla editable de 18 leads con selector de disposición por fila, audit trail, cola de fallos y 3 botones para simular errores |
+| C — Datos y reporting | `src/reporting.py` | Limpia un CSV sucio del partner (subido o el incluido), calcula funnel, leads estancados y qué rompería comisiones. | Pestaña "C · Datos y reporting": subir CSV, vista de datos sucios resaltados, botón de limpieza, métricas y explicación |
+| D — Contenido | `src/content_system.py` | Genera 3 guiones priorizados a partir de `data/content_sources.json`, cada uno trazable a su fuente. | Pestaña "D · Contenido": tarjetas de guiones |
 
 ## Reglas de negocio editables sin tocar código
 
