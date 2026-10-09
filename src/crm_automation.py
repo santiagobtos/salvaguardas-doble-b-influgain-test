@@ -5,6 +5,7 @@ No le interesa. Cada una mueve la etapa del lead, genera un borrador de
 WhatsApp compliant, y deja audit trail. Los errores van a una cola de
 fallos con reintento, nunca se pierden en silencio.
 """
+import random
 from datetime import datetime, timezone
 
 from src import db
@@ -17,14 +18,50 @@ STAGE_MAP = {
     "No le interesa": "Cerrado - Sin Interés",
 }
 
-# Lenguaje compliant: nunca "asesor", nunca promesas de ahorro.
-WHATSAPP_TEMPLATES = {
-    "No Answer": "Hola, intentamos contactarte desde Salvaguardas Doble B y no fue posible. ¿Hay un mejor horario para llamarte?",
-    "Info Sent": "Hola, te compartimos la información de Consejería Clara. Cualquier duda, escríbenos por este medio.",
-    "Transferido": "Hola, un Consejero de Consejería Clara se pondrá en contacto contigo para revisar tu caso.",
-    "Call Back": "Hola, quedamos en volver a contactarte. Te escribiremos pronto desde Salvaguardas Doble B.",
-    "No le interesa": "Entendido, gracias por tu tiempo. Si cambias de opinión, aquí estaremos.",
+_TIPO_DEUDA_FRASES = {
+    "tarjeta_credito": "tu tarjeta de crédito",
+    "libranza": "tu libranza",
+    "libre_inversion": "tu crédito de libre inversión",
+    "hipotecario": "tu situación hipotecaria",
+    "no_especificado": "tu caso",
 }
+
+# Lenguaje compliant: nunca "asesor", nunca promesas de ahorro. Varias
+# variantes por disposición, elegidas al azar, para que no suene a
+# plantilla repetida cada vez que se aplica la misma disposición.
+WHATSAPP_TEMPLATES = {
+    "No Answer": [
+        "Hola, intentamos contactarte desde Salvaguardas Doble B y no fue posible. ¿Hay un mejor horario para llamarte?",
+        "Hola, te buscamos hace un momento y no logramos comunicarnos. ¿Cuándo te queda bien que te volvamos a llamar?",
+        "Hola, quisimos llamarte desde Salvaguardas Doble B pero no contestaste. Avísanos un horario y te intentamos de nuevo.",
+    ],
+    "Info Sent": [
+        "Hola, te compartimos la información de Consejería Clara sobre {tipo_frase}. Cualquier duda, escríbenos por este medio.",
+        "Hola, ya te enviamos los detalles del programa de Consejería Clara para {tipo_frase}. Quedamos atentos a tus preguntas.",
+        "Hola, aquí tienes la información que pediste sobre Consejería Clara. Revisa con calma y nos cuentas.",
+    ],
+    "Transferido": [
+        "Hola, un Consejero de Consejería Clara se pondrá en contacto contigo para revisar {tipo_frase}.",
+        "Hola, ya transferimos tu caso a un Consejero de Consejería Clara. Te contactará pronto para hablar de {tipo_frase}.",
+        "Hola, un Consejero de Consejería Clara va a revisar {tipo_frase} contigo en los próximos días.",
+    ],
+    "Call Back": [
+        "Hola, quedamos en volver a contactarte. Te escribiremos pronto desde Salvaguardas Doble B.",
+        "Hola, anotamos que quieres que te contactemos más adelante. Te vamos a escribir en estos días.",
+        "Hola, entendido — te contactamos de nuevo pronto desde Salvaguardas Doble B.",
+    ],
+    "No le interesa": [
+        "Entendido, gracias por tu tiempo. Si cambias de opinión, aquí estaremos.",
+        "Gracias por avisarnos. No te volveremos a escribir, pero si algo cambia, aquí estamos.",
+        "Perfecto, respetamos tu decisión. Si más adelante te interesa, puedes volver a escribirnos.",
+    ],
+}
+
+
+def generar_mensaje_whatsapp(disposicion, lead=None):
+    tipo_frase = _TIPO_DEUDA_FRASES.get((lead or {}).get("tipo_deuda"), "tu caso")
+    plantilla = random.choice(WHATSAPP_TEMPLATES[disposicion])
+    return plantilla.format(tipo_frase=tipo_frase) if "{tipo_frase}" in plantilla else plantilla
 
 
 def _now():
@@ -65,7 +102,7 @@ def aplicar_disposicion(lead_id, disposicion, actor="sistema"):
     nuevo_stage = STAGE_MAP[disposicion]
     db.actualizar_stage(lead_id, nuevo_stage)
 
-    contenido = WHATSAPP_TEMPLATES[disposicion]
+    contenido = generar_mensaje_whatsapp(disposicion, lead)
     draft_id = db.crear_draft(lead_id, timestamp, canal="whatsapp", contenido=contenido)
 
     db.registrar_audit(

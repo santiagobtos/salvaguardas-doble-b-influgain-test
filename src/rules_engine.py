@@ -70,4 +70,4 @@ def clasificar_mensaje(mensaje, rules=None):
         if monto > deuda_cfg.get("monto_maximo_auto", float("inf")):
             return "escalar_humano", f"Monto de deuda ({monto}) por encima del umbral automático"
 
-    return "responder", "Mensaje dentro de reglas estándar"
+    return "responder", "Mensaje dentro de lo normal"

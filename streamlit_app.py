@@ -57,6 +57,11 @@ h1, h2, h3 { font-family: 'Inter', sans-serif !important; font-weight: 800 !impo
 .lead-card .meta { color: var(--ink-muted); font-size:12.5px; margin-bottom:12px; }
 .lead-card .field-label { font-size:10.5px; text-transform:uppercase; letter-spacing:.05em; color: var(--ink-muted); font-weight:700; margin-top:14px; }
 .lead-card .field-value { font-size:14px; color: var(--ink); margin-top:2px; }
+.top-banner { background: var(--gray-tint); color: var(--ink-soft); font-size: 12.5px; padding: 8px 14px; margin-bottom: 10px; border-radius: 8px; text-align: center; }
+.top-banner b { color: var(--ink); }
+.topbar-brand { font-size: 17px; font-weight: 800; padding-top: 6px; }
+.topbar-brand .topbar-sub { color: var(--ink-muted); font-weight: 400; font-size: 12.5px; margin-left: 6px; }
+div[data-testid="stTabs"] button[role="tab"] p { font-size: 14px; font-weight: 600; }
 </style>
 """,
     unsafe_allow_html=True,
@@ -93,12 +98,15 @@ CARGA_DEFECTO = [
 
 # Pool para la generación automática — plantillas parecidas a mensajes
 # reales, combinadas con montos, creadores y teléfonos aleatorios en cada
-# generación para que ningún lead se repita igual.
+# generación para que ningún lead se repita igual. Agrupado por categoría
+# para que se note la variedad de tono, no solo de monto.
 CREADORES_POOL = [
     "@carla.finanzas", "@juanfi_libre", "@manu.deudas", "@laura_consejos",
     "@pedro.ahorra", "@sofia.claridad", "@andres.deudafree", "@valen.consejos",
+    "@diana.respira", "@oscar.sinsustos", "@camila.alivia", "@fer.consejos",
 ]
 MENSAJES_POOL = [
+    # --- normales: monto + tipo de deuda, tono directo ---
     "Hola, tengo una deuda de tarjeta de credito de {monto} y no se que hacer",
     "Buenas, debo libranza por {monto}, quiero informacion del programa",
     "Me interesa el programa, tengo una deuda hipotecaria de {monto}",
@@ -108,19 +116,54 @@ MENSAJES_POOL = [
     "Vi el reel de ustedes, tengo deudas de consumo por {monto}, me pueden ayudar?",
     "Hola, quiero saber si me pueden ayudar con mi credito de {monto}",
     "Buenas, una amiga me recomendo escribirles, debo {monto} en tarjetas",
+    "Tengo 2 tarjetas y un libre inversion, entre las 2 debo como {monto}",
+    "Hola, mi credito hipotecario quedo atrasado, debo {monto} en mora",
+    # --- normales: tono preocupado / contexto emocional ---
+    "Buenas, perdi mi trabajo hace 2 meses y debo {monto} en tarjetas, no se que hacer",
+    "Hola, con el aumento de las cuotas ya no me alcanza, debo {monto} de libranza",
+    "No he podido dormir pensando en esto, debo {monto} y cada mes es peor",
+    "Hola, me da pena escribir pero ya no se a quien acudir, debo {monto}",
+    "Buenas, mi esposa y yo juntamos deudas de {monto} y estamos agobiados",
+    # --- normales: con preguntas específicas de proceso ---
+    "Hola, si entro al programa esto afecta mi historial de credito? debo {monto}",
+    "Buenas, cuanto se demora el proceso? tengo {monto} en tarjetas",
+    "Hola, ustedes cobran algo por la asesoria? debo {monto} de libre inversion",
+    "Me pueden decir si esto es legal? tengo deudas por {monto} y me da desconfianza",
+    "Hola, que pasa con mi reporte en centrales si hago esto? debo {monto}",
+    # --- normales: informal / con errores de tecleo, como chat real ---
+    "ola buenas dias debo {monto} en targeta y nose q ace",
+    "hola vi el reel, deboo como {monto} entre varias deudas ayuda porfa",
+    "buenas tardes😔 tengo una deuda de {monto} y stoy muy estresada",
+    "hola necesito ayuda urgente debo {monto} y no m alcanza el sueldo",
+    # --- riesgo: debe escalar a humano ---
     "Me llego una demanda por mi tarjeta de credito, que hago",
     "Un abogado me contacto por el embargo de mi cuenta, estoy muy preocupado",
     "Esto es urgente, me amenazan con quitarme la casa",
     "Quiero denunciar un fraude con mi tarjeta",
     "La empresa esta en quiebra y no se que hacer con mis deudas",
+    "Me estan llamando de un juzgado por una deuda vieja, no entiendo nada",
+    "Un cobrador me amenaza con ir a mi trabajo, eso es legal?",
+    "No entiendo la carta que me llego del banco, parece una demanda",
+    # --- salida: deben ignorarse ---
     "No me interesa, quitame de esta lista por favor",
     "Stop, no quiero recibir mas mensajes",
     "Dejen de escribirme, es spam",
+    "Ya resolví mis deudas, quítame de la lista por favor",
+    "Por favor quitame de aquí, esto me llega sin que yo pida nada",
+    # --- interés vago / sin monto claro ---
     "Hola, quiero mas informacion sobre el programa",
     "Buenas, como funciona la consejeria de ustedes",
     "Hola vi el anuncio, me pueden contar mas",
+    "Hola, que es exactamente lo que ofrecen?",
+    "Buenas, un amigo me hablo de ustedes pero no entendi bien que hacen",
+    "Hola, esto es como un abogado o que es?",
 ]
-MONTOS_POOL = [1800000, 2600000, 3200000, 4100000, 5600000, 7300000, 9000000, 11500000, 15000000, 22000000, 38000000]
+MONTOS_POOL = [
+    650000, 980000, 1200000, 1800000, 2200000, 2600000, 3200000, 4100000,
+    4800000, 5600000, 6300000, 7300000, 8200000, 9000000, 10400000, 11500000,
+    13800000, 15000000, 17600000, 19900000, 22000000, 26500000, 31000000,
+    38000000, 45000000, 52000000,
+]
 
 
 def _telefono_aleatorio():
@@ -173,28 +216,37 @@ def stack_fragment():
             st.toast(f"📥 Nuevo lead automático: {lead['lead_id']}")
 
     leads_actuales = db.listar_leads()
-    st.markdown(f"#### Stack de leads &nbsp;·&nbsp; {len(leads_actuales)} en total")
-    st.caption("Haz clic en una fila para ver el lead a detalle.")
+    st.markdown(f"**Stack de leads** &nbsp;·&nbsp; {len(leads_actuales)} en total &nbsp;·&nbsp; <span style='color:var(--ink-muted); font-weight:400; font-size:12.5px;'>clic en una fila para ver el detalle</span>", unsafe_allow_html=True)
 
     if not leads_actuales:
         st.info("Sin leads todavía.")
         return
 
     df_stack = pd.DataFrame(leads_actuales).sort_values("timestamp", ascending=False)
-    df_view = df_stack[["lead_id", "timestamp", "creador", "canal", "mensaje", "estado"]].rename(columns={
-        "lead_id": "ID", "timestamp": "Llegó", "creador": "Creador", "canal": "Canal",
-        "mensaje": "Mensaje", "estado": "Decisión",
+    df_stack["hora"] = pd.to_datetime(df_stack["timestamp"]).dt.strftime("%H:%M:%S")
+    # Mensaje va justo después del ID (no al final) para que se alcance a
+    # leer sin tener que arrastrar el scroll horizontal de la tabla.
+    df_view = df_stack[["lead_id", "mensaje", "estado", "creador", "canal", "hora"]].rename(columns={
+        "lead_id": "ID", "mensaje": "Mensaje", "estado": "Decisión",
+        "creador": "Creador", "canal": "Canal", "hora": "Hora",
     })
 
     evento = st.dataframe(
         df_view,
         use_container_width=True,
         hide_index=True,
-        height=360,
+        height=430,
         on_select="rerun",
         selection_mode="single-row",
         key="stack_leads_tabla",
-        column_config={"Mensaje": st.column_config.TextColumn(width="large")},
+        column_config={
+            "ID": st.column_config.TextColumn(width="small"),
+            "Mensaje": st.column_config.TextColumn(width="large"),
+            "Decisión": st.column_config.TextColumn(width="small"),
+            "Creador": st.column_config.TextColumn(width="small"),
+            "Canal": st.column_config.TextColumn(width="small"),
+            "Hora": st.column_config.TextColumn(width="small"),
+        },
     )
 
     filas_sel = evento.selection["rows"] if evento and evento.selection else []
@@ -240,29 +292,27 @@ def stack_fragment():
         )
 
 
-# ------------------------------------------------------------------ header --
-with st.sidebar:
-    st.markdown("### 🗂️ Salvaguardas Doble B")
-    st.caption("× Consejería Clara — prueba técnica Influgain")
-    st.markdown("---")
-    st.markdown(
-        "Escenario **100% ficticio**: ni la marca, ni los leads, ni las "
-        "inscripciones del partner existen. Nada aquí toca un sistema real."
-    )
-    st.markdown("---")
-    if st.button("🔄 Reiniciar panel (resetea leads en vivo)", use_container_width=True):
-        resetear_operacion_en_vivo()
-        st.rerun()
-    st.caption("Esto reinicia solo la operación en vivo (pestañas A y B). Los datos del Ejercicio C viven en data/.")
-
-st.markdown('<span class="eyebrow">Prueba técnica · Influgain</span>', unsafe_allow_html=True)
-st.title("Un sistema que sigue trabajando aunque nadie esté mirando")
+# --------------------------------------------------------------- top bar --
+# Nada de sidebar: la navegación (pestañas) queda arriba del todo, como en
+# un sitio tipo Notion — banner delgado, barra de marca, y debajo las
+# pestañas, sin título/hero por encima que empuje todo hacia abajo.
 st.markdown(
-    '<p class="lede">Salvaguardas Doble B hace marketing de alivio de deudas vía creadores. '
-    "Los leads escriben por chat a cualquier hora; este panel muestra qué decide el sistema "
-    "solo y en qué momento le pasa el control a un humano.</p>",
+    '<div class="top-banner">🗂️ <b>Escenario 100% ficticio</b> — ni la marca, ni los leads, '
+    "ni las inscripciones del partner existen. Nada aquí toca un sistema real.</div>",
     unsafe_allow_html=True,
 )
+
+topbar_l, topbar_r = st.columns([4, 1])
+with topbar_l:
+    st.markdown(
+        '<div class="topbar-brand">🗂️ Salvaguardas Doble B '
+        '<span class="topbar-sub">× Consejería Clara — prueba técnica Influgain</span></div>',
+        unsafe_allow_html=True,
+    )
+with topbar_r:
+    if st.button("🔄 Reiniciar panel", use_container_width=True):
+        resetear_operacion_en_vivo()
+        st.rerun()
 
 tab_inicio, tab_a, tab_b, tab_c, tab_d = st.tabs(
     ["🏠 Inicio", "Leads que llegan", "B · CRM y disposiciones", "C · Datos y reporting", "D · Contenido"]
@@ -272,6 +322,16 @@ tab_inicio, tab_a, tab_b, tab_c, tab_d = st.tabs(
 # INICIO                                                                   #
 # ======================================================================= #
 with tab_inicio:
+    st.markdown('<span class="eyebrow">Prueba técnica · Influgain</span>', unsafe_allow_html=True)
+    st.title("Un sistema que sigue trabajando aunque nadie esté mirando")
+    st.markdown(
+        '<p class="lede">Salvaguardas Doble B hace marketing de alivio de deudas vía creadores. '
+        "Los leads escriben por chat a cualquier hora; este panel muestra qué decide el sistema "
+        "solo y en qué momento le pasa el control a un humano.</p>",
+        unsafe_allow_html=True,
+    )
+    st.markdown("---")
+
     leads_vivo = db.listar_leads()
     decisiones = db.listar_decisiones()
     fallos = db.listar_fallos_pendientes()
@@ -308,13 +368,12 @@ with tab_inicio:
 # LEADS QUE LLEGAN (EJERCICIO A)                                           #
 # ======================================================================= #
 with tab_a:
-    st.markdown('<span class="eyebrow">Ejercicio A · 30%</span>', unsafe_allow_html=True)
-    st.header("Leads que llegan")
     st.markdown(
-        '<p class="lede">Cada fila es un mensaje que acaba de entrar por chat. En cuanto llega, '
-        "pasa directo a procesamiento: el sistema lo clasifica solo, sin que nadie lo toque.</p>",
+        '<span class="eyebrow">Ejercicio A · 30%</span>'
+        '<span style="font-size:13px;color:var(--ink-muted);"> — cada mensaje nuevo pasa directo a procesamiento, sin que nadie lo toque.</span>',
         unsafe_allow_html=True,
     )
+    st.markdown("### Leads que llegan")
 
     if not st.session_state["primera_carga_hecha"]:
         # ---- Estado inicial: todavía no se ha hecho la primera carga ----
@@ -363,7 +422,6 @@ with tab_a:
                     ingresar_lead(creador, canal, mensaje, telefono or None)
                     st.rerun()
 
-        st.markdown("---")
         stack_fragment()
 
 # ======================================================================= #
