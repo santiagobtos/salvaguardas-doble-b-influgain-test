@@ -46,40 +46,53 @@ _TIPO_DEUDA_FRASES = {
 
 # Lenguaje compliant: nunca "asesor", nunca promesas de ahorro. Varias
 # variantes por disposición, elegidas al azar, para que no suene a
-# plantilla repetida cada vez que se aplica la misma disposición.
+# plantilla repetida — y todas referencian el tipo de deuda (y el monto,
+# cuando lo dieron) que ya extrajo el agente de pre-calificación de las
+# propias palabras del lead, según rules.yaml, para que el mensaje suene
+# a que de verdad se leyó su caso y no a una plantilla genérica.
 WHATSAPP_TEMPLATES = {
     "No Answer": [
-        "Hola, intentamos contactarte desde Salvaguardas Doble B y no fue posible. ¿Hay un mejor horario para llamarte?",
-        "Hola, te buscamos hace un momento y no logramos comunicarnos. ¿Cuándo te queda bien que te volvamos a llamar?",
-        "Hola, quisimos llamarte desde Salvaguardas Doble B pero no contestaste. Avísanos un horario y te intentamos de nuevo.",
+        "Hola, intentamos contactarte desde Salvaguardas Doble B por lo de {tipo_frase}{monto_clause} y no fue posible. ¿Hay un mejor horario para llamarte?",
+        "Hola, te buscamos hace un momento para hablar de {tipo_frase}{monto_clause} y no logramos comunicarnos. ¿Cuándo te queda bien que te volvamos a llamar?",
+        "Hola, quisimos llamarte desde Salvaguardas Doble B por {tipo_frase}{monto_clause} pero no contestaste. Avísanos un horario y te intentamos de nuevo.",
     ],
     "Info Sent": [
-        "Hola, te compartimos la información de Consejería Clara sobre {tipo_frase}. Cualquier duda, escríbenos por este medio.",
-        "Hola, ya te enviamos los detalles del programa de Consejería Clara para {tipo_frase}. Quedamos atentos a tus preguntas.",
-        "Hola, aquí tienes la información que pediste sobre Consejería Clara. Revisa con calma y nos cuentas.",
+        "Hola, te compartimos la información de Consejería Clara sobre {tipo_frase}{monto_clause}. Cualquier duda, escríbenos por este medio.",
+        "Hola, ya te enviamos los detalles del programa de Consejería Clara para {tipo_frase}{monto_clause}. Quedamos atentos a tus preguntas.",
+        "Hola, aquí tienes la información que pediste sobre {tipo_frase}{monto_clause}. Revisa con calma y nos cuentas.",
     ],
     "Transferido": [
-        "Hola, un Consejero de Consejería Clara se pondrá en contacto contigo para revisar {tipo_frase}.",
-        "Hola, ya transferimos tu caso a un Consejero de Consejería Clara. Te contactará pronto para hablar de {tipo_frase}.",
-        "Hola, un Consejero de Consejería Clara va a revisar {tipo_frase} contigo en los próximos días.",
+        "Hola, un Consejero de Consejería Clara se pondrá en contacto contigo para revisar {tipo_frase}{monto_clause}.",
+        "Hola, ya transferimos tu caso a un Consejero de Consejería Clara. Te contactará pronto para hablar de {tipo_frase}{monto_clause}.",
+        "Hola, un Consejero de Consejería Clara va a revisar {tipo_frase}{monto_clause} contigo en los próximos días.",
     ],
     "Call Back": [
-        "Hola, quedamos en volver a contactarte. Te escribiremos pronto desde Salvaguardas Doble B.",
-        "Hola, anotamos que quieres que te contactemos más adelante. Te vamos a escribir en estos días.",
-        "Hola, entendido — te contactamos de nuevo pronto desde Salvaguardas Doble B.",
+        "Hola, quedamos en volver a contactarte por lo de {tipo_frase}{monto_clause}. Te escribiremos pronto desde Salvaguardas Doble B.",
+        "Hola, anotamos que quieres que te contactemos más adelante para seguir hablando de {tipo_frase}{monto_clause}. Te vamos a escribir en estos días.",
+        "Hola, entendido — te contactamos de nuevo pronto para lo de {tipo_frase}{monto_clause}.",
     ],
     "No le interesa": [
-        "Entendido, gracias por tu tiempo. Si cambias de opinión, aquí estaremos.",
-        "Gracias por avisarnos. No te volveremos a escribir, pero si algo cambia, aquí estamos.",
-        "Perfecto, respetamos tu decisión. Si más adelante te interesa, puedes volver a escribirnos.",
+        "Entendido, no seguimos con lo de {tipo_frase}{monto_clause}. Gracias por tu tiempo — si cambias de opinión, aquí estaremos.",
+        "Gracias por avisarnos. No te volveremos a escribir por lo de {tipo_frase}{monto_clause}, pero si algo cambia, aquí estamos.",
+        "Perfecto, respetamos tu decisión sobre {tipo_frase}{monto_clause}. Si más adelante te interesa, puedes volver a escribirnos.",
     ],
 }
 
 
+def _frase_monto(lead):
+    monto = (lead or {}).get("monto_deuda")
+    if not monto:
+        return ""
+    monto_fmt = f"${monto:,}".replace(",", ".")
+    return f" (nos comentaste un monto cercano a {monto_fmt})"
+
+
 def generar_mensaje_whatsapp(disposicion, lead=None):
-    tipo_frase = _TIPO_DEUDA_FRASES.get((lead or {}).get("tipo_deuda"), "tu caso")
+    lead = lead or {}
+    tipo_frase = _TIPO_DEUDA_FRASES.get(lead.get("tipo_deuda"), "tu caso")
+    monto_clause = _frase_monto(lead)
     plantilla = random.choice(WHATSAPP_TEMPLATES[disposicion])
-    return plantilla.format(tipo_frase=tipo_frase) if "{tipo_frase}" in plantilla else plantilla
+    return plantilla.format(tipo_frase=tipo_frase, monto_clause=monto_clause)
 
 
 def _now():
@@ -189,32 +202,6 @@ def aplicar_disposicion(lead_id, disposicion, actor="sistema", forzar_fallo_webh
     )
 
     return {"status": "ok", "stage": nuevo_stage, "draft_id": draft_id, "intentos_webhook": intentos}
-
-
-def enviar_mensaje_manual(lead_id, contenido, actor="humano"):
-    """Mensaje suelto de WhatsApp escrito y enviado a mano por un agente,
-    fuera del flujo de disposiciones (ej. un seguimiento puntual). Como lo
-    escribe y envía la misma persona en el momento, esa acción YA es la
-    revisión humana — por eso queda 'aprobado' directo, a diferencia de los
-    borradores generados por plantilla que sí requieren aprobar aparte."""
-    timestamp = _now()
-    lead = db.get_lead(lead_id)
-    if lead is None:
-        return {"status": "error", "motivo": "lead_no_encontrado"}
-
-    pendiente = next(
-        (d for d in db.listar_drafts() if d["lead_id"] == lead_id and d["status"] == "pending_review"),
-        None,
-    )
-    if pendiente:
-        return {"status": "borrador_pendiente", "motivo": "borrador_sin_revisar", "draft_id": pendiente["draft_id"]}
-
-    draft_id = db.crear_draft(lead_id, timestamp, canal="whatsapp", contenido=contenido, tipo="manual", status="aprobado")
-    db.registrar_audit(
-        timestamp, lead_id, actor, "mensaje_manual",
-        lead["stage"], lead["stage"], f"Mensaje enviado a mano (draft_id={draft_id})",
-    )
-    return {"status": "ok", "draft_id": draft_id}
 
 
 def reintentar_fallos(max_retries=3):

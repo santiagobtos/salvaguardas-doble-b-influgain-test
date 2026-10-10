@@ -392,7 +392,6 @@ def _cerrar_modal_b():
 
 _ETIQUETA_TIPO_DRAFT = {
     "pedir_telefono": "pedido de teléfono",
-    "manual": "mensaje manual",
 }
 
 
@@ -503,56 +502,35 @@ def _contenido_modal_b(lead_id):
             st.rerun(scope="fragment")
 
     st.markdown("---")
-    col_nuevo, col_stage = st.columns(2)
 
-    # ---- 4. Enviar un mensaje nuevo a mano, sin pasar por una disposición ----
-    with col_nuevo:
-        st.markdown("**Enviar nuevo mensaje**")
-        if pendiente:
-            st.caption("Hay un borrador sin revisar arriba — apruébalo o descártalo antes de enviar otro.")
-        with st.form(f"form_manual_{lead_id}", clear_on_submit=True):
-            nuevo_msg = st.text_area(
-                "Mensaje", placeholder="Escribe un mensaje de WhatsApp para este lead…",
-                label_visibility="collapsed",
-            )
-            enviar_manual = st.form_submit_button("Enviar")
-        if enviar_manual:
-            if not nuevo_msg.strip():
-                st.error("Escribe un mensaje antes de enviar.")
+    # ---- 4. Cambiar de stage sin salir del modal, maneje o no maneje ----
+    st.markdown("**Cambiar de stage**")
+    dcol1, dcol2 = st.columns([3, 2])
+    disposicion_sel = dcol1.selectbox(
+        "Disposición", ["", *crm_automation.STAGE_MAP.keys()],
+        key=f"disp_sel_{lead_id}", label_visibility="collapsed",
+    )
+    forzar_webhook_caido = st.checkbox(
+        "Simular caída del webhook del CRM al aplicar (se reintenta solo 2 veces antes de ir a la cola de fallos)",
+        key=f"forzar_webhook_{lead_id}",
+    )
+    if dcol2.button("Aplicar", type="primary", key=f"aplicar_btn_{lead_id}", use_container_width=True):
+        if not disposicion_sel:
+            st.warning("Selecciona una disposición primero.")
+        else:
+            r = crm_automation.aplicar_disposicion(lead_id, disposicion_sel, forzar_fallo_webhook=forzar_webhook_caido)
+            if r["status"] == "ok":
+                intentos = r.get("intentos_webhook", 1)
+                st.success(f"→ **{r['stage']}**. Borrador de WhatsApp generado" + (f" (tras {intentos} intentos)." if intentos > 1 else "."))
+            elif r["status"] == "borrador_pendiente":
+                st.warning("Debes aprobar o descartar el borrador de WhatsApp pendiente antes de aplicar una disposición.")
+            elif r["status"] == "pendiente_dato":
+                st.warning(f"Sin teléfono → **{r['stage']}**. Se le pidió el dato por WhatsApp.")
+            elif r["status"] == "escalado":
+                st.warning("No se pudo aplicar — se escaló a revisión humana.")
             else:
-                r = crm_automation.enviar_mensaje_manual(lead_id, nuevo_msg.strip())
-                if r["status"] == "borrador_pendiente":
-                    st.warning("Ya hay un borrador sin revisar — apruébalo o descártalo antes de enviar otro mensaje.")
-                st.rerun(scope="fragment")
-
-    # ---- 5. Cambiar de stage sin salir del modal, maneje o no maneje ----
-    with col_stage:
-        st.markdown("**Cambiar de stage**")
-        disposicion_sel = st.selectbox(
-            "Disposición", ["", *crm_automation.STAGE_MAP.keys()],
-            key=f"disp_sel_{lead_id}", label_visibility="collapsed",
-        )
-        forzar_webhook_caido = st.checkbox(
-            "Simular caída del webhook del CRM al aplicar",
-            key=f"forzar_webhook_{lead_id}",
-        )
-        if st.button("Aplicar", type="primary", key=f"aplicar_btn_{lead_id}", use_container_width=True):
-            if not disposicion_sel:
-                st.warning("Selecciona una disposición primero.")
-            else:
-                r = crm_automation.aplicar_disposicion(lead_id, disposicion_sel, forzar_fallo_webhook=forzar_webhook_caido)
-                if r["status"] == "ok":
-                    intentos = r.get("intentos_webhook", 1)
-                    st.success(f"→ **{r['stage']}**. Borrador de WhatsApp generado" + (f" (tras {intentos} intentos)." if intentos > 1 else "."))
-                elif r["status"] == "borrador_pendiente":
-                    st.warning("Debes aprobar o descartar el borrador de WhatsApp pendiente antes de aplicar una disposición.")
-                elif r["status"] == "pendiente_dato":
-                    st.warning(f"Sin teléfono → **{r['stage']}**. Se le pidió el dato por WhatsApp.")
-                elif r["status"] == "escalado":
-                    st.warning("No se pudo aplicar — se escaló a revisión humana.")
-                else:
-                    st.error(f"Error ({r.get('motivo')}) → enviado a la cola de fallos.")
-                st.rerun(scope="fragment")
+                st.error(f"Error ({r.get('motivo')}) → enviado a la cola de fallos.")
+            st.rerun(scope="fragment")
 
     audit_lead = [a for a in db.listar_audit_trail() if a["lead_id"] == lead_id]
     if audit_lead:

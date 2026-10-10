@@ -152,11 +152,11 @@ def actualizar_stage(lead_id, nuevo_stage):
     conn.close()
 
 
-def crear_draft(lead_id, timestamp, canal, contenido, tipo=None, status="pending_review"):
+def crear_draft(lead_id, timestamp, canal, contenido, tipo=None):
     conn = get_connection()
     cur = conn.execute(
-        "INSERT INTO drafts (lead_id, timestamp, canal, contenido, tipo, status) VALUES (?, ?, ?, ?, ?, ?)",
-        (lead_id, timestamp, canal, contenido, tipo, status),
+        "INSERT INTO drafts (lead_id, timestamp, canal, contenido, tipo) VALUES (?, ?, ?, ?, ?)",
+        (lead_id, timestamp, canal, contenido, tipo),
     )
     conn.commit()
     draft_id = cur.lastrowid
