@@ -152,6 +152,14 @@ MONTOS_POOL = [
 ]
 
 
+# Probabilidad de que un lead (de carga inicial o generado solo) llegue
+# SIN teléfono — pasa en la vida real (el lead no lo compartió, el
+# formulario lo dejó vacío, etc.) y es justo lo que ejercita la etapa
+# "Pendiente de Teléfono" del Ejercicio B sin depender del botón de
+# simulación.
+_PROB_SIN_TELEFONO = 0.12
+
+
 def _generar_carga_defecto(n=42):
     """Set reproducible (semilla fija, no toca el random global) para la
     primera carga — mínimo 42 leads mezclando los 3 caminos de clasificación."""
@@ -162,7 +170,10 @@ def _generar_carga_defecto(n=42):
         mensaje = plantilla.format(monto=rnd.choice(MONTOS_POOL)) if "{monto}" in plantilla else plantilla
         creador = rnd.choice(CREADORES_POOL)
         canal = rnd.choices(["CTWA", "organico"], weights=[60, 40])[0]
-        telefono = "300" + "".join(str(rnd.randint(0, 9)) for _ in range(7))
+        if rnd.random() < _PROB_SIN_TELEFONO:
+            telefono = None
+        else:
+            telefono = "300" + "".join(str(rnd.randint(0, 9)) for _ in range(7))
         entradas.append((creador, canal, mensaje, telefono))
     return entradas
 
@@ -171,6 +182,8 @@ CARGA_DEFECTO = _generar_carga_defecto(42)
 
 
 def _telefono_aleatorio():
+    if random.random() < _PROB_SIN_TELEFONO:
+        return None
     return "3" + "".join(str(random.randint(0, 9)) for _ in range(9))
 
 
@@ -381,6 +394,14 @@ def mostrar_detalle_lead_b(lead_id):
     st.markdown("**Mensaje del lead**")
     st.write(lead["mensaje"])
 
+    if not lead.get("telefono"):
+        st.warning(
+            "Este lead no tiene teléfono. No se puede transferir al partner hasta conseguirlo — "
+            "si intentas 'Transferido' en la tabla de abajo, el sistema se lo va a pedir "
+            "automáticamente y dejará la etapa en 'Pendiente de Teléfono'.",
+            icon="⚠️",
+        )
+
     c1, c2 = st.columns(2)
     c1.metric("Etapa actual", lead["stage"])
     c2.metric("Decisión del agente", lead["estado"])
@@ -564,6 +585,28 @@ with tab_a:
                     RULES_PATH.write_text(reglas_editadas, encoding="utf-8")
                     st.success("Reglas guardadas. El próximo mensaje ya se clasifica con los valores nuevos.")
 
+# Colores por valor para que la tabla de la pestaña B se lea de un vistazo
+# en el video — qué lead está en qué etapa, sin tener que leer el texto.
+_COLOR_DECISION = {"responder": "#eaf1fe", "escalar_humano": "#fef3dc", "ignorar": "#f1f2f4"}
+_COLOR_ETAPA = {
+    "Reintento": "#fef3dc",
+    "Información Enviada": "#eaf1fe",
+    "Transferido al Partner": "#dcfce7",
+    "Agendado": "#fef3dc",
+    "Descartado": "#f1f2f4",
+    "Pendiente de Teléfono": "#fde2e1",
+}
+
+
+def _colorear_fila_b(row):
+    estilos = []
+    for col in row.index:
+        bg = _COLOR_DECISION.get(row[col]) if col == "Decisión" else None
+        bg = _COLOR_ETAPA.get(row[col]) if col == "Etapa actual" else bg
+        estilos.append(f"background-color:{bg}" if bg else "")
+    return estilos
+
+
 # ======================================================================= #
 # EJERCICIO B — MÓDULO 1                                                   #
 # ======================================================================= #
@@ -586,7 +629,7 @@ with tab_b:
         })
         st.caption("Haz clic en una fila para ver el detalle completo en una ventana emergente.")
         evento_click = st.dataframe(
-            df_click,
+            df_click.style.apply(_colorear_fila_b, axis=1),
             use_container_width=True,
             hide_index=True,
             height=240,
@@ -601,6 +644,12 @@ with tab_b:
             if lead_id_click != st.session_state.get("_modal_b_abierto_para"):
                 st.session_state["_modal_b_abierto_para"] = lead_id_click
                 mostrar_detalle_lead_b(lead_id_click)
+        else:
+            # Se deseleccionó (clic de nuevo en la misma fila, o se limpió la
+            # selección) — "olvidamos" el último lead mostrado para que, si
+            # se vuelve a seleccionar el mismo, el modal se abra de nuevo en
+            # vez de quedarse en silencio por el guard de arriba.
+            st.session_state["_modal_b_abierto_para"] = None
 
         st.markdown("---")
         st.caption("Tabla editable — marca una disposición por fila y aplica en lote:")
@@ -643,6 +692,8 @@ with tab_b:
                         intentos = r.get("intentos_webhook", 1)
                         nota_intentos = f" (tras {intentos} intentos al webhook)" if intentos > 1 else ""
                         st.success(f"{row['ID']}: → **{r['stage']}**. Borrador de WhatsApp generado{nota_intentos}.")
+                    elif r["status"] == "pendiente_dato":
+                        st.warning(f"{row['ID']}: sin teléfono → queda en **{r['stage']}** y se dejó un borrador pidiéndole el dato.")
                     elif r["status"] == "escalado":
                         st.warning(f"{row['ID']}: no se pudo aplicar ({r['motivo']}) → se escaló a revisión humana.")
                     elif r.get("motivo") == "webhook_caido":
@@ -685,7 +736,7 @@ with tab_b:
     if e2.button("Simular transferencia sin teléfono"):
         db.upsert_lead("SIM-NOPHONE", datetime.now(timezone.utc).isoformat(), "@demo", "CTWA", "lead de prueba sin teléfono", None, "responder")
         r = crm_automation.aplicar_disposicion("SIM-NOPHONE", "Transferido")
-        st.warning(f"Resultado: {r}")
+        st.warning(f"SIM-NOPHONE: sin teléfono → queda en **{r.get('stage')}** y se le pidió el dato por WhatsApp.")
         st.rerun()
     if e3.button("Simular disposición inválida"):
         r = crm_automation.aplicar_disposicion(leads[0]["lead_id"] if leads else "N/A", "Disposición Inventada")

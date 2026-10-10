@@ -19,6 +19,17 @@ STAGE_MAP = {
     "No le interesa": "Descartado",
 }
 
+# Etapa aparte de "Agendado": ahí el lead pidió que lo llamen después, acá
+# es el sistema el que necesita un dato del lead para poder avanzar. Son
+# dos situaciones de negocio distintas y conviene que se vean distintas.
+ETAPA_PENDIENTE_TELEFONO = "Pendiente de Teléfono"
+
+_MENSAJES_PEDIR_TELEFONO = [
+    "Hola, para conectarte con un Consejero de Consejería Clara necesitamos un número de contacto válido. ¿Nos lo compartes?",
+    "Hola, nos falta tu número de teléfono para poder transferir tu caso a un Consejero. ¿Nos lo compartes cuando puedas?",
+    "Hola, antes de conectarte con un Consejero necesitamos un teléfono de contacto. ¿Puedes compartirlo por aquí?",
+]
+
 
 class WebhookCRMError(Exception):
     """Simula una falla de red/API al notificar al CRM externo del partner
@@ -123,12 +134,22 @@ def aplicar_disposicion(lead_id, disposicion, actor="sistema", forzar_fallo_webh
         return {"status": "error", "motivo": "lead_no_encontrado"}
 
     if disposicion == "Transferido" and not lead.get("telefono"):
+        estado_anterior = lead["stage"]
+        db.actualizar_stage(lead_id, ETAPA_PENDIENTE_TELEFONO)
+
+        contenido = random.choice(_MENSAJES_PEDIR_TELEFONO)
+        draft_id = db.crear_draft(lead_id, timestamp, canal="whatsapp", contenido=contenido)
+
         db.registrar_audit(
-            timestamp, lead_id, actor, "intento_transferencia_sin_telefono",
-            lead["stage"], lead["stage"], "Teléfono faltante: se escala a revisión manual",
+            timestamp, lead_id, actor, "transferencia_sin_telefono",
+            estado_anterior, ETAPA_PENDIENTE_TELEFONO,
+            f"Teléfono faltante: no se pudo transferir, se dejó borrador pidiendo el dato (draft_id={draft_id})",
         )
-        db.log_decision(timestamp, lead_id, "escalar_humano", "Transferencia sin teléfono válido", None)
-        return {"status": "escalado", "motivo": "telefono_faltante"}
+        db.log_decision(
+            timestamp, lead_id, "escalar_humano",
+            "Transferencia sin teléfono válido — se le pidió el dato al lead", draft_id,
+        )
+        return {"status": "pendiente_dato", "stage": ETAPA_PENDIENTE_TELEFONO, "draft_id": draft_id, "motivo": "telefono_faltante"}
 
     ok, intentos, ultimo_error = _notificar_con_reintentos(lead_id, disposicion, forzar_fallo=forzar_fallo_webhook)
     if not ok:
