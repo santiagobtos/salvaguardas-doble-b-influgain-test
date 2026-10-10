@@ -638,23 +638,26 @@ with tab_b:
         lead_id_click = None
         for titulo, etapas, key in GRUPOS_ETAPA:
             subset = df_click[df_click["Etapa actual"].isin(etapas)].reset_index(drop=True)
-            st.markdown(f"**{titulo}** &nbsp;·&nbsp; {len(subset)}")
-            if subset.empty:
-                st.caption("Ninguno en este momento.")
-                continue
-            evento = st.dataframe(
-                subset.style.apply(_colorear_fila_b, axis=1),
-                use_container_width=True,
-                hide_index=True,
-                height=min(240, 46 + 36 * len(subset)),
-                on_select="rerun",
-                selection_mode="single-row",
-                key=key,
-                column_config={"Mensaje": st.column_config.TextColumn(width="large")},
-            )
-            filas = evento.selection["rows"] if evento and evento.selection else []
-            if filas:
-                lead_id_click = subset.iloc[filas[0]]["ID"]
+            with st.expander(f"{titulo} · {len(subset)}", expanded=True):
+                if subset.empty:
+                    st.caption("Ninguno en este momento.")
+                    continue
+                # Sin "height" fijo: así, al abrir en pantalla completa (ícono
+                # de la esquina de la tabla), Streamlit sí expande la tabla
+                # para ocupar toda la pantalla en vez de dejarla con el mismo
+                # tamaño chico y el resto en blanco.
+                evento = st.dataframe(
+                    subset.style.apply(_colorear_fila_b, axis=1),
+                    use_container_width=True,
+                    hide_index=True,
+                    on_select="rerun",
+                    selection_mode="single-row",
+                    key=key,
+                    column_config={"Mensaje": st.column_config.TextColumn(width="large")},
+                )
+                filas = evento.selection["rows"] if evento and evento.selection else []
+                if filas:
+                    lead_id_click = subset.iloc[filas[0]]["ID"]
 
         if lead_id_click is not None:
             if lead_id_click != st.session_state.get("_modal_b_abierto_para"):
