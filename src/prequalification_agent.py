@@ -25,10 +25,10 @@ _SALUDOS = [
     "Hola, gracias por tu confianza en contarnos esto.",
 ]
 _CUERPOS = [
-    "Con lo que nos compartiste, en muchos casos un Consejero de Consejería Clara podría ayudarte a revisar opciones para tu {tipo_frase}.",
-    "Entendemos que no es fácil hablar de esto. Un Consejero de Consejería Clara suele poder revisar casos como el tuyo con {tipo_frase} y contarte qué opciones existen.",
-    "Leímos tu caso con atención. Un Consejero de Consejería Clara podría orientarte sobre tu {tipo_frase} y qué caminos hay disponibles.",
-    "Casos como el tuyo con {tipo_frase} los revisa un Consejero de Consejería Clara, que puede contarte con calma qué opciones aplican.",
+    "Con lo que nos compartiste, en muchos casos un Consejero de Consejería Clara podría ayudarte a revisar opciones para tu {tipo_frase}{monto_clause}.",
+    "Entendemos que no es fácil hablar de esto. Un Consejero de Consejería Clara suele poder revisar casos como el tuyo con {tipo_frase}{monto_clause} y contarte qué opciones existen.",
+    "Leímos tu caso con atención. Un Consejero de Consejería Clara podría orientarte sobre tu {tipo_frase}{monto_clause} y qué caminos hay disponibles.",
+    "Casos como el tuyo con {tipo_frase}{monto_clause} los revisa un Consejero de Consejería Clara, que puede contarte con calma qué opciones aplican.",
 ]
 _DISCLAIMERS = [
     "Esto no es una promesa de ahorro ni de aprobación, depende de la revisión de tu caso.",
@@ -102,11 +102,19 @@ def construir_resumen_escalado(creador, canal, mensaje, razon):
     )
 
 
-def generar_draft_respuesta(tipo_deuda):
+def _frase_monto(monto):
+    if not monto:
+        return ""
+    monto_fmt = f"${monto:,}".replace(",", ".")
+    return f" (nos comentaste un monto cercano a {monto_fmt})"
+
+
+def generar_draft_respuesta(tipo_deuda, monto=None):
     tipo_frase = _TIPO_DEUDA_FRASES.get(tipo_deuda, "deuda")
+    monto_clause = _frase_monto(monto)
     return " ".join([
         random.choice(_SALUDOS),
-        random.choice(_CUERPOS).format(tipo_frase=tipo_frase),
+        random.choice(_CUERPOS).format(tipo_frase=tipo_frase, monto_clause=monto_clause),
         random.choice(_DISCLAIMERS),
         random.choice(_CIERRES),
     ])
@@ -138,7 +146,7 @@ def procesar_mensaje_entrante(lead_id, creador, canal, mensaje, telefono):
         db.actualizar_prequalificacion(lead_id, monto, tipo_deuda, interes)
         razon = _construir_razon_responder(tipo_deuda, monto, interes)
 
-        contenido = generar_draft_respuesta(tipo_deuda)
+        contenido = generar_draft_respuesta(tipo_deuda, monto)
         draft_id = db.crear_draft(lead_id, timestamp, canal=canal, contenido=contenido)
     elif decision == "escalar_humano":
         resumen = construir_resumen_escalado(creador, canal, mensaje, razon)

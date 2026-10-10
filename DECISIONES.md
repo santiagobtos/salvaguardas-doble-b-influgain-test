@@ -31,3 +31,17 @@ fuera, y por qué:
   vivo.** Es intencional: la prueba pide reporting sobre datos sucios como
   insumo separado, no sobre el estado transaccional del CRM corriendo en
   esta demo.
+
+- **Sin un LLM en vivo redactando los mensajes.** Lo evalué y decidí no
+  conectar una API de IA generativa (tipo Claude/OpenAI) para los borradores
+  de WhatsApp. En un contexto de compliance financiero duro (nunca prometer
+  ahorro, nunca decir "asesor", nunca inventar tasas) un LLM sin guardrails
+  serios puede alucinar y violar justo esas reglas — un riesgo que no quería
+  asumir en 72 horas sin poder probarlo a fondo. En su lugar, las plantillas
+  de `crm_automation.WHATSAPP_TEMPLATES` son deterministas (nunca rompen
+  compliance) y sí incorporan lo que el lead escribió de verdad — tipo de
+  deuda y monto, extraídos vía `rules.yaml` — que es lo que la prueba mide
+  explícitamente ("criterio de negocio, no si pegas bien un prompt"). En
+  producción, el primer paso hacia un LLM real sería agregarlo detrás de un
+  validador post-generación que rechace cualquier borrador con lenguaje
+  prohibido antes de dejarlo en la cola humana.
