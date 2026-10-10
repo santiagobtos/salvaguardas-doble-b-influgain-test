@@ -628,27 +628,42 @@ with tab_b:
             "stage": "Etapa actual", "creador": "Creador", "canal": "Canal",
         })
         st.caption("Haz clic en una fila para ver el detalle completo en una ventana emergente.")
-        evento_click = st.dataframe(
-            df_click.style.apply(_colorear_fila_b, axis=1),
-            use_container_width=True,
-            hide_index=True,
-            height=240,
-            on_select="rerun",
-            selection_mode="single-row",
-            key="tabla_b_detalle",
-            column_config={"Mensaje": st.column_config.TextColumn(width="large")},
-        )
-        filas_click = evento_click.selection["rows"] if evento_click and evento_click.selection else []
-        if filas_click:
-            lead_id_click = df_click.iloc[filas_click[0]]["ID"]
+
+        GRUPOS_ETAPA = [
+            ("No manejadas", ["Nuevo"], "tabla_b_no_manejadas"),
+            ("Pendientes", ["Reintento", "Agendado", "Pendiente de Teléfono", "Información Enviada"], "tabla_b_pendientes"),
+            ("Manejadas", ["Transferido al Partner", "Descartado"], "tabla_b_manejadas"),
+        ]
+
+        lead_id_click = None
+        for titulo, etapas, key in GRUPOS_ETAPA:
+            subset = df_click[df_click["Etapa actual"].isin(etapas)].reset_index(drop=True)
+            st.markdown(f"**{titulo}** &nbsp;·&nbsp; {len(subset)}")
+            if subset.empty:
+                st.caption("Ninguno en este momento.")
+                continue
+            evento = st.dataframe(
+                subset.style.apply(_colorear_fila_b, axis=1),
+                use_container_width=True,
+                hide_index=True,
+                height=min(240, 46 + 36 * len(subset)),
+                on_select="rerun",
+                selection_mode="single-row",
+                key=key,
+                column_config={"Mensaje": st.column_config.TextColumn(width="large")},
+            )
+            filas = evento.selection["rows"] if evento and evento.selection else []
+            if filas:
+                lead_id_click = subset.iloc[filas[0]]["ID"]
+
+        if lead_id_click is not None:
             if lead_id_click != st.session_state.get("_modal_b_abierto_para"):
                 st.session_state["_modal_b_abierto_para"] = lead_id_click
                 mostrar_detalle_lead_b(lead_id_click)
         else:
-            # Se deseleccionó (clic de nuevo en la misma fila, o se limpió la
-            # selección) — "olvidamos" el último lead mostrado para que, si
-            # se vuelve a seleccionar el mismo, el modal se abra de nuevo en
-            # vez de quedarse en silencio por el guard de arriba.
+            # Ninguna de las tres tablas tiene fila seleccionada — "olvidamos"
+            # el último lead mostrado para que, si se vuelve a seleccionar el
+            # mismo, el modal se abra de nuevo en vez de quedarse en silencio.
             st.session_state["_modal_b_abierto_para"] = None
 
         st.markdown("---")
