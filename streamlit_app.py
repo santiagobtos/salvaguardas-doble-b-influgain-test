@@ -374,11 +374,18 @@ def stack_fragment():
             st.caption("Este lead no generó borrador (fue ignorado).")
 
 
-def _cerrar_modal_b():
-    st.session_state["_modal_b_lead_id"] = None
-
-
 _TABLAS_B_KEYS = ["tabla_b_no_manejadas", "tabla_b_pendientes", "tabla_b_manejadas"]
+
+
+def _cerrar_modal_b():
+    """Callback de on_dismiss (X, Escape, clic afuera). No basta con
+    borrar _modal_b_lead_id: si no se limpia TAMBIÉN la selección de la
+    fila en su tabla, en el próximo rerun el código la vuelve a leer como
+    "hubo un clic" sobre ese mismo lead y reabre el modal al instante —
+    el bug de "nunca se cierra"."""
+    st.session_state["_modal_b_lead_id"] = None
+    for key in _TABLAS_B_KEYS:
+        st.session_state.pop(key, None)
 
 
 def _refrescar_modal_b(lead_id):
