@@ -459,6 +459,8 @@ def mostrar_detalle_lead_b(lead_id):
                 r = crm_automation.aplicar_disposicion(lead_id, "Transferido")
                 if r["status"] == "ok":
                     st.success(f"Teléfono guardado y transferido → {r['stage']}.")
+                elif r["status"] == "borrador_pendiente":
+                    st.warning("Teléfono guardado — pero debes aprobar o descartar el borrador de WhatsApp pendiente antes de poder transferir.")
                 else:
                     st.info("Teléfono guardado.")
                 _refrescar_modal_b(lead_id)
@@ -471,14 +473,20 @@ def mostrar_detalle_lead_b(lead_id):
         "Disposición", ["", *crm_automation.STAGE_MAP.keys()],
         key=f"disp_sel_{lead_id}", label_visibility="collapsed",
     )
+    forzar_webhook_caido = st.checkbox(
+        "Simular caída del webhook del CRM al aplicar (se reintenta solo 2 veces antes de ir a la cola de fallos)",
+        key=f"forzar_webhook_{lead_id}",
+    )
     if dcol2.button("Aplicar", type="primary", key=f"aplicar_btn_{lead_id}", use_container_width=True):
         if not disposicion_sel:
             st.warning("Selecciona una disposición primero.")
         else:
-            r = crm_automation.aplicar_disposicion(lead_id, disposicion_sel)
+            r = crm_automation.aplicar_disposicion(lead_id, disposicion_sel, forzar_fallo_webhook=forzar_webhook_caido)
             if r["status"] == "ok":
                 intentos = r.get("intentos_webhook", 1)
                 st.success(f"→ **{r['stage']}**. Borrador de WhatsApp generado" + (f" (tras {intentos} intentos)." if intentos > 1 else "."))
+            elif r["status"] == "borrador_pendiente":
+                st.warning("Debes aprobar o descartar el borrador de WhatsApp pendiente antes de aplicar una disposición.")
             elif r["status"] == "pendiente_dato":
                 st.warning(f"Sin teléfono → **{r['stage']}**. Se le pidió el dato por WhatsApp.")
             elif r["status"] == "escalado":
@@ -495,28 +503,31 @@ def mostrar_detalle_lead_b(lead_id):
             use_container_width=True, hide_index=True,
         )
 
-    # ---- 3. Revisar y aprobar el borrador aquí mismo (nunca se envía solo) ----
+    # ---- 3. Histórico completo de borradores — hay que poder ver todo lo
+    # que ya se le mandó a este lead antes de decidir qué hacer con el que
+    # está pendiente (nunca se envía solo) ----
     drafts_lead = [d for d in db.listar_drafts() if d["lead_id"] == lead_id]
     if drafts_lead:
-        ultimo = drafts_lead[-1]
-        st.markdown("**Último borrador de WhatsApp generado para este lead**")
-        if ultimo["status"] == "pending_review":
-            texto_editado = st.text_area(
-                "Editar antes de aprobar", value=ultimo["contenido"],
-                key=f"draft_edit_{ultimo['draft_id']}", label_visibility="collapsed",
-            )
-            bcol1, bcol2 = st.columns(2)
-            if bcol1.button("Aprobar borrador", type="primary", key=f"aprobar_{ultimo['draft_id']}", use_container_width=True):
-                db.actualizar_draft(ultimo["draft_id"], texto_editado, "aprobado")
-                _refrescar_modal_b(lead_id)
-            if bcol2.button("Descartar borrador", key=f"descartar_{ultimo['draft_id']}", use_container_width=True):
-                db.actualizar_draft(ultimo["draft_id"], ultimo["contenido"], "descartado")
-                _refrescar_modal_b(lead_id)
-        else:
-            st.markdown(
-                f'<div class="chat-bubble draft"><span class="stamp">{ultimo["canal"]} · {ultimo["status"]}</span>{ultimo["contenido"]}</div>',
-                unsafe_allow_html=True,
-            )
+        st.markdown(f"**Histórico de WhatsApp con este lead ({len(drafts_lead)})**")
+        for draft in sorted(drafts_lead, key=lambda d: d["draft_id"], reverse=True):
+            if draft["status"] == "pending_review":
+                st.markdown('<span class="badge" style="background:#fdf0cc;">pendiente de aprobar</span>', unsafe_allow_html=True)
+                texto_editado = st.text_area(
+                    "Editar antes de aprobar", value=draft["contenido"],
+                    key=f"draft_edit_{draft['draft_id']}", label_visibility="collapsed",
+                )
+                bcol1, bcol2 = st.columns(2)
+                if bcol1.button("Aprobar borrador", type="primary", key=f"aprobar_{draft['draft_id']}", use_container_width=True):
+                    db.actualizar_draft(draft["draft_id"], texto_editado, "aprobado")
+                    _refrescar_modal_b(lead_id)
+                if bcol2.button("Descartar borrador", key=f"descartar_{draft['draft_id']}", use_container_width=True):
+                    db.actualizar_draft(draft["draft_id"], draft["contenido"], "descartado")
+                    _refrescar_modal_b(lead_id)
+            else:
+                st.markdown(
+                    f'<div class="chat-bubble draft"><span class="stamp">{draft["timestamp"]} · {draft["canal"]} · {draft["status"]}</span>{draft["contenido"]}</div>',
+                    unsafe_allow_html=True,
+                )
 
 
 # --------------------------------------------------------------- top bar --
@@ -758,57 +769,6 @@ with tab_b:
         if st.session_state.get("_modal_b_lead_id"):
             mostrar_detalle_lead_b(st.session_state["_modal_b_lead_id"])
 
-        st.markdown("---")
-        st.caption("Tabla editable — marca una disposición por fila y aplica en lote:")
-
-        df = pd.DataFrame(leads)[["lead_id", "timestamp", "creador", "canal", "mensaje", "telefono", "estado", "stage"]]
-        df = df.rename(columns={
-            "lead_id": "ID", "timestamp": "Timestamp", "creador": "Creador", "canal": "Canal",
-            "mensaje": "Mensaje del lead", "telefono": "Teléfono", "estado": "Decisión del agente",
-            "stage": "Etapa actual",
-        })
-        df["Disposición a aplicar"] = ""
-
-        edited = st.data_editor(
-            df,
-            column_config={
-                "Disposición a aplicar": st.column_config.SelectboxColumn(
-                    options=["", *crm_automation.STAGE_MAP.keys()],
-                ),
-                "Mensaje del lead": st.column_config.TextColumn(width="large"),
-            },
-            disabled=["ID", "Timestamp", "Creador", "Canal", "Mensaje del lead", "Teléfono", "Decisión del agente", "Etapa actual"],
-            hide_index=True,
-            use_container_width=True,
-            key="crm_editor",
-        )
-
-        forzar_webhook_caido = st.checkbox(
-            "Simular caída del webhook del CRM al aplicar (se reintenta solo 2 veces antes de ir a la cola de fallos)",
-        )
-        if st.button("Aplicar disposiciones seleccionadas", type="primary"):
-            pendientes = edited[edited["Disposición a aplicar"] != ""]
-            if pendientes.empty:
-                st.info("No seleccionaste ninguna disposición en la tabla.")
-            else:
-                for _, row in pendientes.iterrows():
-                    r = crm_automation.aplicar_disposicion(
-                        row["ID"], row["Disposición a aplicar"], forzar_fallo_webhook=forzar_webhook_caido,
-                    )
-                    if r["status"] == "ok":
-                        intentos = r.get("intentos_webhook", 1)
-                        nota_intentos = f" (tras {intentos} intentos al webhook)" if intentos > 1 else ""
-                        st.success(f"{row['ID']}: → **{r['stage']}**. Borrador de WhatsApp generado{nota_intentos}.")
-                    elif r["status"] == "pendiente_dato":
-                        st.warning(f"{row['ID']}: sin teléfono → queda en **{r['stage']}** y se dejó un borrador pidiéndole el dato.")
-                    elif r["status"] == "escalado":
-                        st.warning(f"{row['ID']}: no se pudo aplicar ({r['motivo']}) → se escaló a revisión humana.")
-                    elif r.get("motivo") == "webhook_caido":
-                        st.error(f"{row['ID']}: el webhook del CRM no respondió tras {r.get('intentos_webhook')} intentos automáticos → enviado a la cola de fallos.")
-                    else:
-                        st.error(f"{row['ID']}: error ({r.get('motivo')}) → enviado a la cola de fallos.")
-                st.rerun()
-
     st.markdown("### Último borrador de WhatsApp generado")
     drafts = db.listar_drafts()
     if drafts:
@@ -835,8 +795,8 @@ with tab_b:
     st.subheader("Manejo de errores simulado")
     st.caption(
         "Teléfono faltante, lead inexistente, disposición inválida o un webhook caído — nada se pierde en "
-        "silencio. El webhook caído se simula con el checkbox de arriba (al aplicar una disposición real); "
-        "estos dos botones cubren los otros dos casos."
+        "silencio. El webhook caído se simula con el checkbox dentro del detalle de cada lead (al aplicar "
+        "una disposición real); estos dos botones cubren los otros dos casos."
     )
 
     e2, e3 = st.columns(2)

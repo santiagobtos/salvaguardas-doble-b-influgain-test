@@ -133,6 +133,21 @@ def aplicar_disposicion(lead_id, disposicion, actor="sistema", forzar_fallo_webh
         )
         return {"status": "error", "motivo": "lead_no_encontrado"}
 
+    # Regla dura: "nunca publica ni transfiere solo". Si hay un borrador sin
+    # revisar (pending_review) para este lead, no se deja aplicar ninguna
+    # disposición hasta que un humano lo apruebe o lo descarte — así nunca
+    # se acumulan mensajes sin revisar ni se avanza un lead "a ciegas".
+    borrador_pendiente = next(
+        (d for d in db.listar_drafts() if d["lead_id"] == lead_id and d["status"] == "pending_review"),
+        None,
+    )
+    if borrador_pendiente:
+        return {
+            "status": "borrador_pendiente",
+            "motivo": "borrador_sin_revisar",
+            "draft_id": borrador_pendiente["draft_id"],
+        }
+
     if disposicion == "Transferido" and not lead.get("telefono"):
         estado_anterior = lead["stage"]
         db.actualizar_stage(lead_id, ETAPA_PENDIENTE_TELEFONO)
