@@ -361,6 +361,57 @@ def stack_fragment():
             st.caption("Este lead no generó borrador (fue ignorado).")
 
 
+@st.dialog("Detalle del lead")
+def mostrar_detalle_lead_b(lead_id):
+    """Ventana emergente con el detalle completo de un lead — se abre al
+    hacer clic en una fila de la tabla de la pestaña B."""
+    lead = db.get_lead(lead_id)
+    if not lead:
+        st.error("Este lead ya no existe (puede que se haya reiniciado el panel).")
+        return
+
+    badge = lead["estado"]
+    st.markdown(
+        f'<h3 style="margin:0 0 4px;">{lead["lead_id"]} <span class="badge {badge}">{badge.replace("_"," ")}</span></h3>'
+        f'<div style="color:var(--ink-muted); font-size:12.5px; margin-bottom:14px;">'
+        f'{lead["creador"]} · {lead["canal"]} · {lead.get("telefono") or "sin teléfono"} · llegó {lead["timestamp"]}</div>',
+        unsafe_allow_html=True,
+    )
+
+    st.markdown("**Mensaje del lead**")
+    st.write(lead["mensaje"])
+
+    c1, c2 = st.columns(2)
+    c1.metric("Etapa actual", lead["stage"])
+    c2.metric("Decisión del agente", lead["estado"])
+
+    if lead.get("monto_deuda") or lead.get("tipo_deuda"):
+        st.markdown(
+            f"**Pre-calificación:** monto {lead.get('monto_deuda') or '—'} · "
+            f"tipo de deuda {lead.get('tipo_deuda') or '—'} · "
+            f"interés en Consejero: {'sí' if lead.get('interes_consejero') else 'no'}"
+        )
+
+    audit_lead = [a for a in db.listar_audit_trail() if a["lead_id"] == lead_id]
+    if audit_lead:
+        st.markdown("**Historial de auditoría de este lead**")
+        st.dataframe(
+            pd.DataFrame(audit_lead)[["timestamp", "actor", "accion", "estado_anterior", "estado_nuevo"]],
+            use_container_width=True, hide_index=True,
+        )
+
+    drafts_lead = [d for d in db.listar_drafts() if d["lead_id"] == lead_id]
+    if drafts_lead:
+        ultimo = drafts_lead[-1]
+        st.markdown("**Último borrador de WhatsApp generado para este lead**")
+        st.markdown(
+            f'<div class="chat-bubble draft"><span class="stamp">{ultimo["canal"]} · {ultimo["status"]}</span>{ultimo["contenido"]}</div>',
+            unsafe_allow_html=True,
+        )
+
+    st.caption("Para aplicar una disposición a este lead, ciérrala y usa la tabla de abajo.")
+
+
 # --------------------------------------------------------------- top bar --
 # Nada de sidebar: la navegación (pestañas) queda arriba del todo, como en
 # un sitio tipo Notion — banner delgado, barra de marca, y debajo las
@@ -529,6 +580,31 @@ with tab_b:
     if not leads:
         st.info("No hay leads todavía — ve a la pestaña 'Leads que llegan' para hacer la primera carga.")
     else:
+        df_click = pd.DataFrame(leads)[["lead_id", "mensaje", "estado", "stage", "creador", "canal"]].rename(columns={
+            "lead_id": "ID", "mensaje": "Mensaje", "estado": "Decisión",
+            "stage": "Etapa actual", "creador": "Creador", "canal": "Canal",
+        })
+        st.caption("Haz clic en una fila para ver el detalle completo en una ventana emergente.")
+        evento_click = st.dataframe(
+            df_click,
+            use_container_width=True,
+            hide_index=True,
+            height=240,
+            on_select="rerun",
+            selection_mode="single-row",
+            key="tabla_b_detalle",
+            column_config={"Mensaje": st.column_config.TextColumn(width="large")},
+        )
+        filas_click = evento_click.selection["rows"] if evento_click and evento_click.selection else []
+        if filas_click:
+            lead_id_click = df_click.iloc[filas_click[0]]["ID"]
+            if lead_id_click != st.session_state.get("_modal_b_abierto_para"):
+                st.session_state["_modal_b_abierto_para"] = lead_id_click
+                mostrar_detalle_lead_b(lead_id_click)
+
+        st.markdown("---")
+        st.caption("Tabla editable — marca una disposición por fila y aplica en lote:")
+
         df = pd.DataFrame(leads)[["lead_id", "timestamp", "creador", "canal", "mensaje", "telefono", "estado", "stage"]]
         df = df.rename(columns={
             "lead_id": "ID", "timestamp": "Timestamp", "creador": "Creador", "canal": "Canal",
