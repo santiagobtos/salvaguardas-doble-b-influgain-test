@@ -44,7 +44,8 @@ CREATE TABLE IF NOT EXISTS drafts (
     timestamp TEXT,
     canal TEXT,
     contenido TEXT,
-    status TEXT DEFAULT 'pending_review'
+    status TEXT DEFAULT 'pending_review',
+    tipo TEXT
 );
 
 CREATE TABLE IF NOT EXISTS audit_trail (
@@ -82,6 +83,11 @@ def init_db():
     conn.executescript(SCHEMA)
     try:
         conn.execute("ALTER TABLE decisions_log ADD COLUMN resumen TEXT")
+        conn.commit()
+    except sqlite3.OperationalError:
+        pass  # ya existe (base creada con un esquema anterior)
+    try:
+        conn.execute("ALTER TABLE drafts ADD COLUMN tipo TEXT")
         conn.commit()
     except sqlite3.OperationalError:
         pass  # ya existe (base creada con un esquema anterior)
@@ -146,11 +152,11 @@ def actualizar_stage(lead_id, nuevo_stage):
     conn.close()
 
 
-def crear_draft(lead_id, timestamp, canal, contenido):
+def crear_draft(lead_id, timestamp, canal, contenido, tipo=None, status="pending_review"):
     conn = get_connection()
     cur = conn.execute(
-        "INSERT INTO drafts (lead_id, timestamp, canal, contenido) VALUES (?, ?, ?, ?)",
-        (lead_id, timestamp, canal, contenido),
+        "INSERT INTO drafts (lead_id, timestamp, canal, contenido, tipo, status) VALUES (?, ?, ?, ?, ?, ?)",
+        (lead_id, timestamp, canal, contenido, tipo, status),
     )
     conn.commit()
     draft_id = cur.lastrowid

@@ -50,7 +50,9 @@ h1, h2, h3 { font-family: 'Inter', sans-serif !important; font-weight: 800 !impo
 .badge.ignorar { background: var(--gray-tint); color: var(--ink-muted); }
 .chat-bubble { background:#fff; border:1px solid var(--border); border-radius:12px 12px 12px 3px; padding:10px 14px; font-size:13px; margin:8px 0; max-width:85%; }
 .chat-bubble.draft { background: var(--brand-tint); border-color:#d7e4fc; border-radius:12px 12px 3px 12px; margin-left:auto; color: var(--brand-dark); }
-.chat-bubble .stamp { font-size:9.5px; text-transform:uppercase; letter-spacing:.04em; opacity:.7; display:block; margin-bottom:3px; }
+.chat-bubble.descartado { background: var(--gray-tint); border-color:var(--border); color: var(--ink-muted); text-decoration: line-through; }
+.chat-bubble .stamp { font-size:9.5px; text-transform:uppercase; letter-spacing:.04em; opacity:.7; display:block; margin-bottom:3px; text-decoration:none; }
+.sin-respuesta { text-align:center; color: var(--ink-muted); font-size:11.5px; margin:10px 0; }
 .script-card { background:#fff; border:1px solid var(--border); border-radius:14px; overflow:hidden; margin-bottom:12px; }
 .script-card .strip { background: var(--brand-tint); color: var(--brand-dark); font-size:11px; font-weight:700; padding:8px 14px; display:flex; justify-content:space-between; }
 .script-card .body { padding:14px; font-size:12.8px; color: var(--ink-soft); white-space:pre-wrap; line-height:1.55; }
@@ -388,22 +390,10 @@ def _cerrar_modal_b():
         st.session_state.pop(key, None)
 
 
-def _refrescar_modal_b(lead_id):
-    """Llamar después de cualquier acción dentro del modal que pueda mover
-    al lead de grupo (aplicar disposición, aprobar borrador, etc.).
-
-    Streamlit recuerda la selección de una tabla por POSICIÓN de fila, no
-    por lead_id. Si la acción saca a este lead de su grupo (ej. pasa de
-    "No manejadas" a "Manejadas"), la fila que antes ocupaba su posición
-    ahora es OTRO lead — y sin este reseteo, ese lead distinto se
-    detectaría como "clic nuevo" y el modal saltaría a mostrarlo en vez
-    de seguir mostrando este. Por eso se limpia la selección de las tres
-    tablas antes de refrescar.
-    """
-    for key in _TABLAS_B_KEYS:
-        st.session_state.pop(key, None)
-    st.session_state["_modal_b_lead_id"] = lead_id
-    st.rerun()
+_ETIQUETA_TIPO_DRAFT = {
+    "pedir_telefono": "pedido de teléfono",
+    "manual": "mensaje manual",
+}
 
 
 @st.dialog("Detalle del lead", on_dismiss=_cerrar_modal_b)
@@ -412,6 +402,16 @@ def mostrar_detalle_lead_b(lead_id):
     diferencia de un simple visor, las acciones reales pasan aquí mismo
     (aplicar disposición, completar el teléfono, aprobar el borrador) en
     vez de obligar a cerrarla y buscar la fila otra vez."""
+    _contenido_modal_b(lead_id)
+
+
+@st.fragment
+def _contenido_modal_b(lead_id):
+    """Todo lo interactivo del modal vive en un fragmento: un clic adentro
+    (aplicar disposición, aprobar/descartar, enviar un mensaje) solo vuelve
+    a correr ESTE fragmento (st.rerun(scope="fragment")), no la app entera
+    — así la ventana no se cierra y se reabre en cada clic, se siente como
+    un panel que se actualiza en el sitio."""
     lead = db.get_lead(lead_id)
     if not lead:
         st.error("Este lead ya no existe (puede que se haya reiniciado el panel).")
@@ -425,9 +425,6 @@ def mostrar_detalle_lead_b(lead_id):
         unsafe_allow_html=True,
     )
 
-    st.markdown("**Mensaje del lead**")
-    st.write(lead["mensaje"])
-
     c1, c2 = st.columns(2)
     c1.metric("Etapa actual", lead["stage"])
     c2.metric("Decisión del agente", lead["estado"])
@@ -439,10 +436,14 @@ def mostrar_detalle_lead_b(lead_id):
             f"interés en Consejero: {'sí' if lead.get('interes_consejero') else 'no'}"
         )
 
+    drafts_lead = [d for d in db.listar_drafts() if d["lead_id"] == lead_id]
+    pendiente = next((d for d in drafts_lead if d["status"] == "pending_review"), None)
+
     # ---- 1. Teléfono faltante: se arregla aquí mismo, no solo se avisa ----
     if not lead.get("telefono"):
+        motivo_tel = " — por eso el último mensaje le está pidiendo justamente ese dato" if pendiente and pendiente.get("tipo") == "pedir_telefono" else ""
         st.warning(
-            "Este lead no tiene teléfono — no se puede transferir al partner hasta conseguirlo.",
+            f"Este lead no tiene teléfono — no se puede transferir al partner hasta conseguirlo{motivo_tel}.",
             icon="⚠️",
         )
         with st.form(f"form_tel_{lead_id}", clear_on_submit=True):
@@ -463,71 +464,104 @@ def mostrar_detalle_lead_b(lead_id):
                     st.warning("Teléfono guardado — pero debes aprobar o descartar el borrador de WhatsApp pendiente antes de poder transferir.")
                 else:
                     st.info("Teléfono guardado.")
-                _refrescar_modal_b(lead_id)
+                st.rerun(scope="fragment")
 
-    # ---- 2. Aplicar una disposición sin salir del modal ----
+    # ---- 2. Conversación estilo WhatsApp: mensaje del lead primero, y
+    # luego cada mensaje que ya le mandamos, en orden cronológico ----
     st.markdown("---")
-    st.markdown("**Aplicar disposición**")
-    dcol1, dcol2 = st.columns([3, 2])
-    disposicion_sel = dcol1.selectbox(
-        "Disposición", ["", *crm_automation.STAGE_MAP.keys()],
-        key=f"disp_sel_{lead_id}", label_visibility="collapsed",
+    st.markdown("**Conversación de WhatsApp**")
+    st.markdown(
+        f'<div class="chat-bubble"><span class="stamp">{lead["creador"]} · {lead["timestamp"]}</span>{lead["mensaje"]}</div>',
+        unsafe_allow_html=True,
     )
-    forzar_webhook_caido = st.checkbox(
-        "Simular caída del webhook del CRM al aplicar (se reintenta solo 2 veces antes de ir a la cola de fallos)",
-        key=f"forzar_webhook_{lead_id}",
+    resueltos = sorted([d for d in drafts_lead if d["status"] in ("aprobado", "descartado")], key=lambda d: d["draft_id"])
+    for d in resueltos:
+        etiqueta = _ETIQUETA_TIPO_DRAFT.get(d["tipo"])
+        stamp = d["timestamp"] + (f" · {etiqueta}" if etiqueta else "") + (" · descartado" if d["status"] == "descartado" else "")
+        clase = "chat-bubble draft" + (" descartado" if d["status"] == "descartado" else "")
+        st.markdown(f'<div class="{clase}"><span class="stamp">{stamp}</span>{d["contenido"]}</div>', unsafe_allow_html=True)
+    st.markdown(
+        '<div class="sin-respuesta">Este lead no ha enviado respuesta — este WhatsApp de demo es de solo salida, no recibe mensajes reales.</div>',
+        unsafe_allow_html=True,
     )
-    if dcol2.button("Aplicar", type="primary", key=f"aplicar_btn_{lead_id}", use_container_width=True):
-        if not disposicion_sel:
-            st.warning("Selecciona una disposición primero.")
-        else:
-            r = crm_automation.aplicar_disposicion(lead_id, disposicion_sel, forzar_fallo_webhook=forzar_webhook_caido)
-            if r["status"] == "ok":
-                intentos = r.get("intentos_webhook", 1)
-                st.success(f"→ **{r['stage']}**. Borrador de WhatsApp generado" + (f" (tras {intentos} intentos)." if intentos > 1 else "."))
-            elif r["status"] == "borrador_pendiente":
-                st.warning("Debes aprobar o descartar el borrador de WhatsApp pendiente antes de aplicar una disposición.")
-            elif r["status"] == "pendiente_dato":
-                st.warning(f"Sin teléfono → **{r['stage']}**. Se le pidió el dato por WhatsApp.")
-            elif r["status"] == "escalado":
-                st.warning("No se pudo aplicar — se escaló a revisión humana.")
+
+    # ---- 3. Borrador sin enviar, si lo hay — se revisa aquí mismo, nunca
+    # se manda solo ----
+    if pendiente:
+        etiqueta = _ETIQUETA_TIPO_DRAFT.get(pendiente["tipo"])
+        st.markdown(f"**Borrador sin enviar{f' — {etiqueta}' if etiqueta else ''}**")
+        texto_editado = st.text_area(
+            "Editar antes de aprobar", value=pendiente["contenido"],
+            key=f"draft_edit_{pendiente['draft_id']}", label_visibility="collapsed",
+        )
+        bcol1, bcol2 = st.columns(2)
+        if bcol1.button("Aprobar y enviar", type="primary", key=f"aprobar_{pendiente['draft_id']}", use_container_width=True):
+            db.actualizar_draft(pendiente["draft_id"], texto_editado, "aprobado")
+            st.rerun(scope="fragment")
+        if bcol2.button("Descartar", key=f"descartar_{pendiente['draft_id']}", use_container_width=True):
+            db.actualizar_draft(pendiente["draft_id"], pendiente["contenido"], "descartado")
+            st.rerun(scope="fragment")
+
+    st.markdown("---")
+    col_nuevo, col_stage = st.columns(2)
+
+    # ---- 4. Enviar un mensaje nuevo a mano, sin pasar por una disposición ----
+    with col_nuevo:
+        st.markdown("**Enviar nuevo mensaje**")
+        if pendiente:
+            st.caption("Hay un borrador sin revisar arriba — apruébalo o descártalo antes de enviar otro.")
+        with st.form(f"form_manual_{lead_id}", clear_on_submit=True):
+            nuevo_msg = st.text_area(
+                "Mensaje", placeholder="Escribe un mensaje de WhatsApp para este lead…",
+                label_visibility="collapsed",
+            )
+            enviar_manual = st.form_submit_button("Enviar")
+        if enviar_manual:
+            if not nuevo_msg.strip():
+                st.error("Escribe un mensaje antes de enviar.")
             else:
-                st.error(f"Error ({r.get('motivo')}) → enviado a la cola de fallos.")
-            _refrescar_modal_b(lead_id)
+                r = crm_automation.enviar_mensaje_manual(lead_id, nuevo_msg.strip())
+                if r["status"] == "borrador_pendiente":
+                    st.warning("Ya hay un borrador sin revisar — apruébalo o descártalo antes de enviar otro mensaje.")
+                st.rerun(scope="fragment")
+
+    # ---- 5. Cambiar de stage sin salir del modal, maneje o no maneje ----
+    with col_stage:
+        st.markdown("**Cambiar de stage**")
+        disposicion_sel = st.selectbox(
+            "Disposición", ["", *crm_automation.STAGE_MAP.keys()],
+            key=f"disp_sel_{lead_id}", label_visibility="collapsed",
+        )
+        forzar_webhook_caido = st.checkbox(
+            "Simular caída del webhook del CRM al aplicar",
+            key=f"forzar_webhook_{lead_id}",
+        )
+        if st.button("Aplicar", type="primary", key=f"aplicar_btn_{lead_id}", use_container_width=True):
+            if not disposicion_sel:
+                st.warning("Selecciona una disposición primero.")
+            else:
+                r = crm_automation.aplicar_disposicion(lead_id, disposicion_sel, forzar_fallo_webhook=forzar_webhook_caido)
+                if r["status"] == "ok":
+                    intentos = r.get("intentos_webhook", 1)
+                    st.success(f"→ **{r['stage']}**. Borrador de WhatsApp generado" + (f" (tras {intentos} intentos)." if intentos > 1 else "."))
+                elif r["status"] == "borrador_pendiente":
+                    st.warning("Debes aprobar o descartar el borrador de WhatsApp pendiente antes de aplicar una disposición.")
+                elif r["status"] == "pendiente_dato":
+                    st.warning(f"Sin teléfono → **{r['stage']}**. Se le pidió el dato por WhatsApp.")
+                elif r["status"] == "escalado":
+                    st.warning("No se pudo aplicar — se escaló a revisión humana.")
+                else:
+                    st.error(f"Error ({r.get('motivo')}) → enviado a la cola de fallos.")
+                st.rerun(scope="fragment")
 
     audit_lead = [a for a in db.listar_audit_trail() if a["lead_id"] == lead_id]
     if audit_lead:
+        st.markdown("---")
         st.markdown("**Historial de auditoría de este lead**")
         st.dataframe(
             pd.DataFrame(audit_lead)[["timestamp", "actor", "accion", "estado_anterior", "estado_nuevo"]],
             use_container_width=True, hide_index=True,
         )
-
-    # ---- 3. Histórico completo de borradores — hay que poder ver todo lo
-    # que ya se le mandó a este lead antes de decidir qué hacer con el que
-    # está pendiente (nunca se envía solo) ----
-    drafts_lead = [d for d in db.listar_drafts() if d["lead_id"] == lead_id]
-    if drafts_lead:
-        st.markdown(f"**Histórico de WhatsApp con este lead ({len(drafts_lead)})**")
-        for draft in sorted(drafts_lead, key=lambda d: d["draft_id"], reverse=True):
-            if draft["status"] == "pending_review":
-                st.markdown('<span class="badge" style="background:#fdf0cc;">pendiente de aprobar</span>', unsafe_allow_html=True)
-                texto_editado = st.text_area(
-                    "Editar antes de aprobar", value=draft["contenido"],
-                    key=f"draft_edit_{draft['draft_id']}", label_visibility="collapsed",
-                )
-                bcol1, bcol2 = st.columns(2)
-                if bcol1.button("Aprobar borrador", type="primary", key=f"aprobar_{draft['draft_id']}", use_container_width=True):
-                    db.actualizar_draft(draft["draft_id"], texto_editado, "aprobado")
-                    _refrescar_modal_b(lead_id)
-                if bcol2.button("Descartar borrador", key=f"descartar_{draft['draft_id']}", use_container_width=True):
-                    db.actualizar_draft(draft["draft_id"], draft["contenido"], "descartado")
-                    _refrescar_modal_b(lead_id)
-            else:
-                st.markdown(
-                    f'<div class="chat-bubble draft"><span class="stamp">{draft["timestamp"]} · {draft["canal"]} · {draft["status"]}</span>{draft["contenido"]}</div>',
-                    unsafe_allow_html=True,
-                )
 
 
 # --------------------------------------------------------------- top bar --

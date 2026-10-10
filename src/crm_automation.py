@@ -153,7 +153,7 @@ def aplicar_disposicion(lead_id, disposicion, actor="sistema", forzar_fallo_webh
         db.actualizar_stage(lead_id, ETAPA_PENDIENTE_TELEFONO)
 
         contenido = random.choice(_MENSAJES_PEDIR_TELEFONO)
-        draft_id = db.crear_draft(lead_id, timestamp, canal="whatsapp", contenido=contenido)
+        draft_id = db.crear_draft(lead_id, timestamp, canal="whatsapp", contenido=contenido, tipo="pedir_telefono")
 
         db.registrar_audit(
             timestamp, lead_id, actor, "transferencia_sin_telefono",
@@ -181,7 +181,7 @@ def aplicar_disposicion(lead_id, disposicion, actor="sistema", forzar_fallo_webh
     db.actualizar_stage(lead_id, nuevo_stage)
 
     contenido = generar_mensaje_whatsapp(disposicion, lead)
-    draft_id = db.crear_draft(lead_id, timestamp, canal="whatsapp", contenido=contenido)
+    draft_id = db.crear_draft(lead_id, timestamp, canal="whatsapp", contenido=contenido, tipo="disposicion")
 
     db.registrar_audit(
         timestamp, lead_id, actor, f"disposicion:{disposicion}",
@@ -189,6 +189,32 @@ def aplicar_disposicion(lead_id, disposicion, actor="sistema", forzar_fallo_webh
     )
 
     return {"status": "ok", "stage": nuevo_stage, "draft_id": draft_id, "intentos_webhook": intentos}
+
+
+def enviar_mensaje_manual(lead_id, contenido, actor="humano"):
+    """Mensaje suelto de WhatsApp escrito y enviado a mano por un agente,
+    fuera del flujo de disposiciones (ej. un seguimiento puntual). Como lo
+    escribe y envía la misma persona en el momento, esa acción YA es la
+    revisión humana — por eso queda 'aprobado' directo, a diferencia de los
+    borradores generados por plantilla que sí requieren aprobar aparte."""
+    timestamp = _now()
+    lead = db.get_lead(lead_id)
+    if lead is None:
+        return {"status": "error", "motivo": "lead_no_encontrado"}
+
+    pendiente = next(
+        (d for d in db.listar_drafts() if d["lead_id"] == lead_id and d["status"] == "pending_review"),
+        None,
+    )
+    if pendiente:
+        return {"status": "borrador_pendiente", "motivo": "borrador_sin_revisar", "draft_id": pendiente["draft_id"]}
+
+    draft_id = db.crear_draft(lead_id, timestamp, canal="whatsapp", contenido=contenido, tipo="manual", status="aprobado")
+    db.registrar_audit(
+        timestamp, lead_id, actor, "mensaje_manual",
+        lead["stage"], lead["stage"], f"Mensaje enviado a mano (draft_id={draft_id})",
+    )
+    return {"status": "ok", "draft_id": draft_id}
 
 
 def reintentar_fallos(max_retries=3):
