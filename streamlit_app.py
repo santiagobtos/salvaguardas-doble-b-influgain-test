@@ -374,10 +374,37 @@ def stack_fragment():
             st.caption("Este lead no generó borrador (fue ignorado).")
 
 
-@st.dialog("Detalle del lead")
+def _cerrar_modal_b():
+    st.session_state["_modal_b_lead_id"] = None
+
+
+_TABLAS_B_KEYS = ["tabla_b_no_manejadas", "tabla_b_pendientes", "tabla_b_manejadas"]
+
+
+def _refrescar_modal_b(lead_id):
+    """Llamar después de cualquier acción dentro del modal que pueda mover
+    al lead de grupo (aplicar disposición, aprobar borrador, etc.).
+
+    Streamlit recuerda la selección de una tabla por POSICIÓN de fila, no
+    por lead_id. Si la acción saca a este lead de su grupo (ej. pasa de
+    "No manejadas" a "Manejadas"), la fila que antes ocupaba su posición
+    ahora es OTRO lead — y sin este reseteo, ese lead distinto se
+    detectaría como "clic nuevo" y el modal saltaría a mostrarlo en vez
+    de seguir mostrando este. Por eso se limpia la selección de las tres
+    tablas antes de refrescar.
+    """
+    for key in _TABLAS_B_KEYS:
+        st.session_state.pop(key, None)
+    st.session_state["_modal_b_lead_id"] = lead_id
+    st.rerun()
+
+
+@st.dialog("Detalle del lead", on_dismiss=_cerrar_modal_b)
 def mostrar_detalle_lead_b(lead_id):
-    """Ventana emergente con el detalle completo de un lead — se abre al
-    hacer clic en una fila de la tabla de la pestaña B."""
+    """Ventana emergente con el detalle completo de un lead — y, a
+    diferencia de un simple visor, las acciones reales pasan aquí mismo
+    (aplicar disposición, completar el teléfono, aprobar el borrador) en
+    vez de obligar a cerrarla y buscar la fila otra vez."""
     lead = db.get_lead(lead_id)
     if not lead:
         st.error("Este lead ya no existe (puede que se haya reiniciado el panel).")
@@ -394,14 +421,6 @@ def mostrar_detalle_lead_b(lead_id):
     st.markdown("**Mensaje del lead**")
     st.write(lead["mensaje"])
 
-    if not lead.get("telefono"):
-        st.warning(
-            "Este lead no tiene teléfono. No se puede transferir al partner hasta conseguirlo — "
-            "si intentas 'Transferido' en la tabla de abajo, el sistema se lo va a pedir "
-            "automáticamente y dejará la etapa en 'Pendiente de Teléfono'.",
-            icon="⚠️",
-        )
-
     c1, c2 = st.columns(2)
     c1.metric("Etapa actual", lead["stage"])
     c2.metric("Decisión del agente", lead["estado"])
@@ -413,6 +432,54 @@ def mostrar_detalle_lead_b(lead_id):
             f"interés en Consejero: {'sí' if lead.get('interes_consejero') else 'no'}"
         )
 
+    # ---- 1. Teléfono faltante: se arregla aquí mismo, no solo se avisa ----
+    if not lead.get("telefono"):
+        st.warning(
+            "Este lead no tiene teléfono — no se puede transferir al partner hasta conseguirlo.",
+            icon="⚠️",
+        )
+        with st.form(f"form_tel_{lead_id}", clear_on_submit=True):
+            nuevo_tel = st.text_input("Agregar teléfono", placeholder="3001234567")
+            guardar_tel = st.form_submit_button("Guardar y reintentar transferencia", type="primary")
+        if guardar_tel:
+            if not nuevo_tel.strip():
+                st.error("Escribe un teléfono antes de guardar.")
+            else:
+                db.upsert_lead(
+                    lead_id, lead["timestamp"], lead["creador"], lead["canal"],
+                    lead["mensaje"], nuevo_tel.strip(), lead["estado"],
+                )
+                r = crm_automation.aplicar_disposicion(lead_id, "Transferido")
+                if r["status"] == "ok":
+                    st.success(f"Teléfono guardado y transferido → {r['stage']}.")
+                else:
+                    st.info("Teléfono guardado.")
+                _refrescar_modal_b(lead_id)
+
+    # ---- 2. Aplicar una disposición sin salir del modal ----
+    st.markdown("---")
+    st.markdown("**Aplicar disposición**")
+    dcol1, dcol2 = st.columns([3, 2])
+    disposicion_sel = dcol1.selectbox(
+        "Disposición", ["", *crm_automation.STAGE_MAP.keys()],
+        key=f"disp_sel_{lead_id}", label_visibility="collapsed",
+    )
+    if dcol2.button("Aplicar", type="primary", key=f"aplicar_btn_{lead_id}", use_container_width=True):
+        if not disposicion_sel:
+            st.warning("Selecciona una disposición primero.")
+        else:
+            r = crm_automation.aplicar_disposicion(lead_id, disposicion_sel)
+            if r["status"] == "ok":
+                intentos = r.get("intentos_webhook", 1)
+                st.success(f"→ **{r['stage']}**. Borrador de WhatsApp generado" + (f" (tras {intentos} intentos)." if intentos > 1 else "."))
+            elif r["status"] == "pendiente_dato":
+                st.warning(f"Sin teléfono → **{r['stage']}**. Se le pidió el dato por WhatsApp.")
+            elif r["status"] == "escalado":
+                st.warning("No se pudo aplicar — se escaló a revisión humana.")
+            else:
+                st.error(f"Error ({r.get('motivo')}) → enviado a la cola de fallos.")
+            _refrescar_modal_b(lead_id)
+
     audit_lead = [a for a in db.listar_audit_trail() if a["lead_id"] == lead_id]
     if audit_lead:
         st.markdown("**Historial de auditoría de este lead**")
@@ -421,16 +488,28 @@ def mostrar_detalle_lead_b(lead_id):
             use_container_width=True, hide_index=True,
         )
 
+    # ---- 3. Revisar y aprobar el borrador aquí mismo (nunca se envía solo) ----
     drafts_lead = [d for d in db.listar_drafts() if d["lead_id"] == lead_id]
     if drafts_lead:
         ultimo = drafts_lead[-1]
         st.markdown("**Último borrador de WhatsApp generado para este lead**")
-        st.markdown(
-            f'<div class="chat-bubble draft"><span class="stamp">{ultimo["canal"]} · {ultimo["status"]}</span>{ultimo["contenido"]}</div>',
-            unsafe_allow_html=True,
-        )
-
-    st.caption("Para aplicar una disposición a este lead, ciérrala y usa la tabla de abajo.")
+        if ultimo["status"] == "pending_review":
+            texto_editado = st.text_area(
+                "Editar antes de aprobar", value=ultimo["contenido"],
+                key=f"draft_edit_{ultimo['draft_id']}", label_visibility="collapsed",
+            )
+            bcol1, bcol2 = st.columns(2)
+            if bcol1.button("Aprobar borrador", type="primary", key=f"aprobar_{ultimo['draft_id']}", use_container_width=True):
+                db.actualizar_draft(ultimo["draft_id"], texto_editado, "aprobado")
+                _refrescar_modal_b(lead_id)
+            if bcol2.button("Descartar borrador", key=f"descartar_{ultimo['draft_id']}", use_container_width=True):
+                db.actualizar_draft(ultimo["draft_id"], ultimo["contenido"], "descartado")
+                _refrescar_modal_b(lead_id)
+        else:
+            st.markdown(
+                f'<div class="chat-bubble draft"><span class="stamp">{ultimo["canal"]} · {ultimo["status"]}</span>{ultimo["contenido"]}</div>',
+                unsafe_allow_html=True,
+            )
 
 
 # --------------------------------------------------------------- top bar --
@@ -659,15 +738,18 @@ with tab_b:
                 if filas:
                     lead_id_click = subset.iloc[filas[0]]["ID"]
 
-        if lead_id_click is not None:
-            if lead_id_click != st.session_state.get("_modal_b_abierto_para"):
-                st.session_state["_modal_b_abierto_para"] = lead_id_click
-                mostrar_detalle_lead_b(lead_id_click)
-        else:
-            # Ninguna de las tres tablas tiene fila seleccionada — "olvidamos"
-            # el último lead mostrado para que, si se vuelve a seleccionar el
-            # mismo, el modal se abra de nuevo en vez de quedarse en silencio.
-            st.session_state["_modal_b_abierto_para"] = None
+        # Un clic nuevo en una fila cambia CUÁL lead debe mostrarse; una vez
+        # fijado, el modal se vuelve a invocar en CADA rerun mientras el
+        # estado siga apuntando a ese lead — así los botones de adentro
+        # (aplicar disposición, guardar teléfono, aprobar borrador) pueden
+        # hacer st.rerun() y la ventana se mantiene abierta con datos
+        # frescos, en vez de cerrarse sola. Se limpia solo al cerrarla
+        # (on_dismiss) o al seleccionar un lead distinto.
+        if lead_id_click is not None and lead_id_click != st.session_state.get("_modal_b_lead_id"):
+            st.session_state["_modal_b_lead_id"] = lead_id_click
+
+        if st.session_state.get("_modal_b_lead_id"):
+            mostrar_detalle_lead_b(st.session_state["_modal_b_lead_id"])
 
         st.markdown("---")
         st.caption("Tabla editable — marca una disposición por fila y aplica en lote:")

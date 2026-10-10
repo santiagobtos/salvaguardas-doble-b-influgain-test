@@ -158,6 +158,18 @@ def crear_draft(lead_id, timestamp, canal, contenido):
     return draft_id
 
 
+def actualizar_draft(draft_id, contenido, status):
+    """Edición + aprobación/descarte humano de un borrador — el momento de
+    revisión que exige la regla de negocio de no enviar nada solo."""
+    conn = get_connection()
+    conn.execute(
+        "UPDATE drafts SET contenido=?, status=? WHERE draft_id=?",
+        (contenido, status, draft_id),
+    )
+    conn.commit()
+    conn.close()
+
+
 def listar_drafts(status=None):
     conn = get_connection()
     if status:
