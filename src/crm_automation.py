@@ -24,10 +24,16 @@ STAGE_MAP = {
 # dos situaciones de negocio distintas y conviene que se vean distintas.
 ETAPA_PENDIENTE_TELEFONO = "Pendiente de Teléfono"
 
+# Transferido: sin teléfono no hay forma de que el Consejero contacte al
+# lead. Call Back: literalmente no se puede "devolver una llamada" sin un
+# número al que llamar. Las demás disposiciones no lo necesitan para
+# ejecutarse (son mensajes de WhatsApp, no llamadas).
+_DISPOSICIONES_REQUIEREN_TELEFONO = {"Transferido", "Call Back"}
+
 _MENSAJES_PEDIR_TELEFONO = [
-    "Hola, para conectarte con un Consejero de Consejería Clara necesitamos un número de contacto válido. ¿Nos lo compartes?",
-    "Hola, nos falta tu número de teléfono para poder transferir tu caso a un Consejero. ¿Nos lo compartes cuando puedas?",
-    "Hola, antes de conectarte con un Consejero necesitamos un teléfono de contacto. ¿Puedes compartirlo por aquí?",
+    "Hola, para seguir con tu caso necesitamos un número de contacto válido. ¿Nos lo compartes?",
+    "Hola, nos falta tu número de teléfono para poder avanzar con tu caso. ¿Nos lo compartes cuando puedas?",
+    "Hola, antes de seguir necesitamos un teléfono de contacto. ¿Puedes compartirlo por aquí?",
 ]
 
 
@@ -161,23 +167,27 @@ def aplicar_disposicion(lead_id, disposicion, actor="sistema", forzar_fallo_webh
             "draft_id": borrador_pendiente["draft_id"],
         }
 
-    if disposicion == "Transferido" and not lead.get("telefono"):
+    if disposicion in _DISPOSICIONES_REQUIEREN_TELEFONO and not lead.get("telefono"):
         estado_anterior = lead["stage"]
         db.actualizar_stage(lead_id, ETAPA_PENDIENTE_TELEFONO)
+        db.set_disposicion_pendiente(lead_id, disposicion)
 
         contenido = random.choice(_MENSAJES_PEDIR_TELEFONO)
         draft_id = db.crear_draft(lead_id, timestamp, canal="whatsapp", contenido=contenido, tipo="pedir_telefono")
 
         db.registrar_audit(
-            timestamp, lead_id, actor, "transferencia_sin_telefono",
+            timestamp, lead_id, actor, "disposicion_requiere_telefono",
             estado_anterior, ETAPA_PENDIENTE_TELEFONO,
-            f"Teléfono faltante: no se pudo transferir, se dejó borrador pidiendo el dato (draft_id={draft_id})",
+            f"Teléfono faltante: no se pudo aplicar '{disposicion}', se dejó borrador pidiendo el dato (draft_id={draft_id})",
         )
         db.log_decision(
             timestamp, lead_id, "escalar_humano",
-            "Transferencia sin teléfono válido — se le pidió el dato al lead", draft_id,
+            f"'{disposicion}' sin teléfono válido — se le pidió el dato al lead", draft_id,
         )
-        return {"status": "pendiente_dato", "stage": ETAPA_PENDIENTE_TELEFONO, "draft_id": draft_id, "motivo": "telefono_faltante"}
+        return {
+            "status": "pendiente_dato", "stage": ETAPA_PENDIENTE_TELEFONO, "draft_id": draft_id,
+            "motivo": "telefono_faltante", "disposicion_pendiente": disposicion,
+        }
 
     ok, intentos, ultimo_error = _notificar_con_reintentos(lead_id, disposicion, forzar_fallo=forzar_fallo_webhook)
     if not ok:
@@ -192,6 +202,8 @@ def aplicar_disposicion(lead_id, disposicion, actor="sistema", forzar_fallo_webh
     estado_anterior = lead["stage"]
     nuevo_stage = STAGE_MAP[disposicion]
     db.actualizar_stage(lead_id, nuevo_stage)
+    if lead.get("disposicion_pendiente"):
+        db.set_disposicion_pendiente(lead_id, None)
 
     contenido = generar_mensaje_whatsapp(disposicion, lead)
     draft_id = db.crear_draft(lead_id, timestamp, canal="whatsapp", contenido=contenido, tipo="disposicion")

@@ -70,6 +70,14 @@ def _formatear_precalificacion(lead):
     interes_fmt = "Sí" if lead.get("interes_consejero") else "No"
     return monto_fmt, tipo_fmt, interes_fmt
 
+
+def _colorear_fila_sin_telefono(row, sin_telefono=frozenset()):
+    """Resalta en rosa toda la fila de un lead sin teléfono — mismo color
+    que ya usa el sistema para la etapa 'Pendiente de Teléfono' en otras
+    tablas, para que se note de un vistazo sin tener que abrir el lead."""
+    bg = "#fde2e1" if row.get("ID") in sin_telefono else ""
+    return [f"background-color:{bg}" if bg else "" for _ in row.index]
+
 st.set_page_config(
     page_title="Salvaguardas Doble B — Panel de Operación",
     layout="wide",
@@ -313,9 +321,10 @@ def stack_fragment():
         "lead_id": "ID", "mensaje": "Mensaje", "estado": "Decisión",
         "creador": "Creador", "canal": "Canal", "hora": "Hora",
     })
+    leads_sin_telefono_a = set(df_stack.loc[df_stack["telefono"].isna() | (df_stack["telefono"] == ""), "lead_id"])
 
     evento = st.dataframe(
-        df_view,
+        df_view.style.apply(_colorear_fila_sin_telefono, sin_telefono=leads_sin_telefono_a, axis=1),
         use_container_width=True,
         hide_index=True,
         height=430,
@@ -510,14 +519,15 @@ def _contenido_modal_b(lead_id):
 
     # ---- 1. Teléfono faltante: se arregla aquí mismo, no solo se avisa ----
     if not lead.get("telefono"):
+        disposicion_objetivo = lead.get("disposicion_pendiente") or "Transferido"
         motivo_tel = " — por eso el último mensaje le está pidiendo justamente ese dato" if pendiente and pendiente.get("tipo") == "pedir_telefono" else ""
         st.warning(
-            f"Este lead no tiene teléfono — no se puede transferir al partner hasta conseguirlo{motivo_tel}.",
+            f"Este lead no tiene teléfono — no se puede aplicar \"{disposicion_objetivo}\" hasta conseguirlo{motivo_tel}.",
             icon="⚠️",
         )
         with st.form(f"form_tel_{lead_id}", clear_on_submit=True):
             nuevo_tel = st.text_input("Agregar teléfono", placeholder="3001234567")
-            guardar_tel = st.form_submit_button("Guardar y reintentar transferencia", type="primary")
+            guardar_tel = st.form_submit_button(f"Guardar y reintentar \"{disposicion_objetivo}\"", type="primary")
         if guardar_tel:
             if not nuevo_tel.strip():
                 st.error("Escribe un teléfono antes de guardar.")
@@ -526,11 +536,11 @@ def _contenido_modal_b(lead_id):
                     lead_id, lead["timestamp"], lead["creador"], lead["canal"],
                     lead["mensaje"], nuevo_tel.strip(), lead["estado"],
                 )
-                r = crm_automation.aplicar_disposicion(lead_id, "Transferido", actor="humano")
+                r = crm_automation.aplicar_disposicion(lead_id, disposicion_objetivo, actor="humano")
                 if r["status"] == "ok":
-                    st.success(f"Teléfono guardado y transferido → {r['stage']}.")
+                    st.success(f"Teléfono guardado → {r['stage']}.")
                 elif r["status"] == "borrador_pendiente":
-                    st.warning("Teléfono guardado — pero debes aprobar o descartar el borrador de WhatsApp pendiente antes de poder transferir.")
+                    st.warning(f"Teléfono guardado — pero debes aprobar o descartar el borrador de WhatsApp pendiente antes de poder aplicar \"{disposicion_objetivo}\".")
                 else:
                     st.info("Teléfono guardado.")
                 st.rerun(scope="fragment")
@@ -815,11 +825,18 @@ _COLOR_ETAPA = {
 }
 
 
-def _colorear_fila_b(row):
+def _colorear_fila_b(row, sin_telefono=frozenset()):
+    # Las celdas que ya tienen su propio color (Decisión, Etapa actual) lo
+    # conservan; el resto de la fila se tiñe del mismo rosa de "problema
+    # de teléfono" que ya usa la etapa Pendiente de Teléfono, para que un
+    # lead sin teléfono se note de un vistazo sin tener que abrirlo.
+    es_sin_tel = row.get("ID") in sin_telefono
     estilos = []
     for col in row.index:
         bg = _COLOR_DECISION.get(row[col]) if col == "Decisión" else None
         bg = _COLOR_ETAPA.get(row[col]) if col == "Etapa actual" else bg
+        if bg is None and es_sin_tel:
+            bg = "#fde2e1"
         estilos.append(f"background-color:{bg}" if bg else "")
     return estilos
 
@@ -861,7 +878,8 @@ with tab_b:
             "lead_id": "ID", "mensaje": "Mensaje", "estado": "Decisión",
             "stage": "Etapa actual", "creador": "Creador", "canal": "Canal",
         })
-        st.caption("Haz clic en una fila para ver el detalle completo en una ventana emergente.")
+        leads_sin_telefono = {l["lead_id"] for l in leads if not l.get("telefono")}
+        st.caption("Haz clic en una fila para ver el detalle completo en una ventana emergente. Las filas en rosa son leads sin teléfono.")
 
         GRUPOS_ETAPA = [
             ("No manejadas", ["Nuevo"], "tabla_b_no_manejadas"),
@@ -881,7 +899,7 @@ with tab_b:
                 # para ocupar toda la pantalla en vez de dejarla con el mismo
                 # tamaño chico y el resto en blanco.
                 evento = st.dataframe(
-                    subset.style.apply(_colorear_fila_b, axis=1),
+                    subset.style.apply(_colorear_fila_b, sin_telefono=leads_sin_telefono, axis=1),
                     use_container_width=True,
                     hide_index=True,
                     on_select="rerun",

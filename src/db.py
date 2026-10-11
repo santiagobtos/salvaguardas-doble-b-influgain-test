@@ -25,7 +25,8 @@ CREATE TABLE IF NOT EXISTS leads (
     monto_deuda INTEGER,
     tipo_deuda TEXT,
     interes_consejero INTEGER,
-    stage TEXT DEFAULT 'Nuevo'
+    stage TEXT DEFAULT 'Nuevo',
+    disposicion_pendiente TEXT
 );
 
 CREATE TABLE IF NOT EXISTS decisions_log (
@@ -91,6 +92,11 @@ def init_db():
         conn.commit()
     except sqlite3.OperationalError:
         pass  # ya existe (base creada con un esquema anterior)
+    try:
+        conn.execute("ALTER TABLE leads ADD COLUMN disposicion_pendiente TEXT")
+        conn.commit()
+    except sqlite3.OperationalError:
+        pass  # ya existe (base creada con un esquema anterior)
     conn.close()
 
 
@@ -148,6 +154,16 @@ def get_lead(lead_id):
 def actualizar_stage(lead_id, nuevo_stage):
     conn = get_connection()
     conn.execute("UPDATE leads SET stage=? WHERE lead_id=?", (nuevo_stage, lead_id))
+    conn.commit()
+    conn.close()
+
+
+def set_disposicion_pendiente(lead_id, disposicion):
+    """Qué disposición quedó esperando el teléfono del lead (o None si ya
+    se resolvió) — para que al guardar el dato se reintente la disposición
+    que de verdad se quería aplicar, no una fija a ciegas."""
+    conn = get_connection()
+    conn.execute("UPDATE leads SET disposicion_pendiente=? WHERE lead_id=?", (disposicion, lead_id))
     conn.commit()
     conn.close()
 
