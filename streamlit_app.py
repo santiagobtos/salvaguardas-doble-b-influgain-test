@@ -1011,8 +1011,15 @@ with tab_b:
         st.warning(f"SIM-NOPHONE: sin teléfono → queda en **{r.get('stage')}** y se le pidió el dato por WhatsApp.")
         st.rerun()
     if e3.button("Simular disposición inválida"):
-        leads_reales = [l for l in leads if not l["lead_id"].startswith("SIM-")]
-        lead_objetivo = leads_reales[0]["lead_id"] if leads_reales else (leads[0]["lead_id"] if leads else "N/A")
+        # Un lead real, al azar (no siempre el mismo) y que no tenga ya un
+        # borrador sin revisar bloqueando el camino — si no, "Corregir y
+        # aplicar" nunca puede funcionar: el gate de "nunca se envía solo"
+        # lo frena antes de llegar a la disposición inválida.
+        candidatos = [l for l in leads if not l["lead_id"].startswith("SIM-")]
+        pendientes_lead_ids = {d["lead_id"] for d in db.listar_drafts() if d["status"] == "pending_review"}
+        libres = [l for l in candidatos if l["lead_id"] not in pendientes_lead_ids]
+        pool_leads = libres or candidatos or leads
+        lead_objetivo = random.choice(pool_leads)["lead_id"] if pool_leads else "N/A"
         valor_invalido, _sugerida = random.choice(_DISPOSICIONES_INVALIDAS_POOL)
         r = crm_automation.aplicar_disposicion(lead_objetivo, valor_invalido)
         st.error(f"{lead_objetivo}: llegó \"{valor_invalido}\" → {r}")
@@ -1099,18 +1106,26 @@ with tab_b:
                     )
                     corregir = ncol2.form_submit_button("Corregir y aplicar", type="primary", use_container_width=True)
                 if corregir:
+                    # st.toast en vez de st.success/warning/error: el
+                    # st.rerun() de abajo borra un aviso normal antes de
+                    # que se alcance a ver (mismo problema que ya se
+                    # arregló en el modal).
                     if not nueva_disp:
-                        st.warning("Selecciona una disposición válida.")
+                        st.toast("Selecciona una disposición válida.", icon="⚠️")
                     elif not payload_sel.get("lead_id"):
-                        st.error("Este fallo no tiene un lead asociado para corregir.")
+                        st.toast("Este fallo no tiene un lead asociado para corregir.", icon="⚠️")
                     else:
                         r = crm_automation.corregir_disposicion_invalida(fallo_sel["id"], payload_sel["lead_id"], nueva_disp)
                         if r["status"] == "ok":
-                            st.success(f"Corregido → {r['stage']}.")
+                            st.toast(f"{payload_sel['lead_id']} corregido → {r['stage']}.", icon="✅")
                         elif r["status"] == "borrador_pendiente":
-                            st.warning("Hay un borrador sin revisar para ese lead — apruébalo o descártalo primero.")
+                            st.toast(
+                                f"{payload_sel['lead_id']} tiene un borrador de WhatsApp sin revisar — "
+                                "apruébalo o descártalo desde el detalle del lead antes de poder corregir esto.",
+                                icon="⚠️",
+                            )
                         else:
-                            st.info(f"Resultado: {r}")
+                            st.toast(f"Resultado: {r}", icon="⚠️")
                         st.rerun()
     else:
         st.caption("Sin fallos — ni pendientes, ni históricos.")
