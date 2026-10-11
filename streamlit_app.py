@@ -21,6 +21,25 @@ from src.prequalification_agent import procesar_mensaje_entrante
 
 RULES_PATH = Path(__file__).resolve().parent / "rules" / "rules.yaml"
 
+_TIPO_DEUDA_LABELS = {
+    "tarjeta_credito": "Tarjeta de crédito",
+    "libranza": "Libranza",
+    "libre_inversion": "Crédito de libre inversión",
+    "hipotecario": "Crédito hipotecario",
+    "no_especificado": "No especificado",
+}
+
+
+def _formatear_precalificacion(lead):
+    """Detalles de pre-calificación en lenguaje legible para el agente
+    humano, no los valores crudos que guarda la base (snake_case, enteros
+    sin separador de miles)."""
+    monto = lead.get("monto_deuda")
+    monto_fmt = f"${monto:,}".replace(",", ".") if monto else "no especificado"
+    tipo_fmt = _TIPO_DEUDA_LABELS.get(lead.get("tipo_deuda"), "no especificado")
+    interes_fmt = "Sí" if lead.get("interes_consejero") else "No"
+    return monto_fmt, tipo_fmt, interes_fmt
+
 st.set_page_config(
     page_title="Salvaguardas Doble B — Panel de Operación",
     layout="wide",
@@ -313,9 +332,10 @@ def stack_fragment():
           <div class="field-value">{ultima_decision['resumen']}</div>
                 """
         if lead_detalle.get("monto_deuda") or lead_detalle.get("tipo_deuda"):
+            monto_fmt, tipo_fmt, interes_fmt = _formatear_precalificacion(lead_detalle)
             detalle_html += f"""
           <div class="field-label">Pre-calificación</div>
-          <div class="field-value">Monto: {lead_detalle.get('monto_deuda') or '—'} · Tipo de deuda: {lead_detalle.get('tipo_deuda') or '—'} · Interés en Consejero: {'sí' if lead_detalle.get('interes_consejero') else 'no'}</div>
+          <div class="field-value">Monto: {monto_fmt} · Tipo de deuda: {tipo_fmt} · Interés en Consejero: {interes_fmt}</div>
             """
         detalle_html += f"""
           <div class="field-label">Etapa actual en el CRM</div>
@@ -444,11 +464,16 @@ def _contenido_modal_b(lead_id):
     c2.metric("Decisión del agente", lead["estado"])
 
     if lead.get("monto_deuda") or lead.get("tipo_deuda"):
+        monto_fmt, tipo_fmt, interes_fmt = _formatear_precalificacion(lead)
         st.markdown(
-            f"**Pre-calificación:** monto {lead.get('monto_deuda') or '—'} · "
-            f"tipo de deuda {lead.get('tipo_deuda') or '—'} · "
-            f"interés en Consejero: {'sí' if lead.get('interes_consejero') else 'no'}"
+            f'<span class="flow-stat">Monto: {monto_fmt}</span> '
+            f'<span class="flow-stat">Tipo de deuda: {tipo_fmt}</span> '
+            f'<span class="flow-stat">Interés en Consejero: {interes_fmt}</span>',
+            unsafe_allow_html=True,
         )
+        decision_lead = next((d for d in db.listar_decisiones() if d["lead_id"] == lead_id), None)
+        if decision_lead:
+            st.caption(f"Por qué el sistema decidió esto: {decision_lead['razon']}")
 
     drafts_lead = [d for d in db.listar_drafts() if d["lead_id"] == lead_id]
     pendiente = next((d for d in drafts_lead if d["status"] == "pending_review"), None)
