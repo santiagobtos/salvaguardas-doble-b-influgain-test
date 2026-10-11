@@ -450,18 +450,25 @@ def stack_fragment():
             st.caption("Este lead no generó borrador (fue ignorado).")
 
 
-_TABLAS_B_KEYS = ["tabla_b_no_manejadas", "tabla_b_pendientes", "tabla_b_manejadas"]
+def _tabla_b_key(base):
+    """La key real de cada tabla lleva un número de versión al final.
+    Borrar la entrada de session_state (lo que se hacía antes) no basta:
+    el componente de tabla es lo bastante complejo como para no limpiar
+    su marca visual de fila seleccionada solo porque el backend ya no
+    tiene el valor — hay que forzar una key nueva para que Streamlit lo
+    reconstruya desde cero, sin ninguna fila marcada."""
+    version = st.session_state.get("_tablas_b_version", 0)
+    return f"{base}_v{version}"
 
 
 def _cerrar_modal_b():
     """Callback de on_dismiss (X, Escape, clic afuera). No basta con
-    borrar _modal_b_lead_id: si no se limpia TAMBIÉN la selección de la
-    fila en su tabla, en el próximo rerun el código la vuelve a leer como
-    "hubo un clic" sobre ese mismo lead y reabre el modal al instante —
-    el bug de "nunca se cierra"."""
+    borrar _modal_b_lead_id: si no se le cambia también la key a las 3
+    tablas (ver _tabla_b_key), el checkbox se queda marcado en pantalla
+    (o, peor, en el próximo rerun el código lo vuelve a leer como "hubo
+    un clic" sobre ese mismo lead y reabre el modal al instante)."""
     st.session_state["_modal_b_lead_id"] = None
-    for key in _TABLAS_B_KEYS:
-        st.session_state.pop(key, None)
+    st.session_state["_tablas_b_version"] = st.session_state.get("_tablas_b_version", 0) + 1
 
 
 _ETIQUETA_TIPO_DRAFT = {
@@ -904,7 +911,7 @@ with tab_b:
                     hide_index=True,
                     on_select="rerun",
                     selection_mode="single-row",
-                    key=key,
+                    key=_tabla_b_key(key),
                     column_config={"Mensaje": st.column_config.TextColumn(width="large")},
                 )
                 filas = evento.selection["rows"] if evento and evento.selection else []
