@@ -390,36 +390,32 @@ def stack_fragment():
         ultimo_draft = drafts_lead[-1] if drafts_lead else None
 
         badge = lead_detalle["estado"]
-        detalle_html = f"""
-        <div class="lead-card">
-          <h4>{lead_detalle['lead_id']} <span class="badge {badge}">{badge.replace('_',' ')}</span></h4>
-          <div class="meta">{lead_detalle['creador']} · {lead_detalle['canal']} · {lead_detalle.get('telefono') or 'sin teléfono'} · llegó {lead_detalle['timestamp']}</div>
-          <div class="field-label">Mensaje</div>
-          <div class="field-value">{lead_detalle['mensaje']}</div>
-        """
+        partes_detalle = [
+            '<div class="lead-card">',
+            f'<h4>{lead_detalle["lead_id"]} <span class="badge {badge}">{badge.replace("_"," ")}</span></h4>',
+            f'<div class="meta">{lead_detalle["creador"]} · {lead_detalle["canal"]} · '
+            f'{lead_detalle.get("telefono") or "sin teléfono"} · llegó {lead_detalle["timestamp"]}</div>',
+            '<div class="field-label">Mensaje</div>',
+            f'<div class="field-value">{lead_detalle["mensaje"]}</div>',
+        ]
         if ultima_decision:
             label_razon = "Motivo" if badge == "escalar_humano" else "Por qué el sistema decidió esto"
-            detalle_html += f"""
-          <div class="field-label">{label_razon}</div>
-          <div class="field-value">{ultima_decision['razon']}</div>
-            """
+            partes_detalle.append(f'<div class="field-label">{label_razon}</div>')
+            partes_detalle.append(f'<div class="field-value">{ultima_decision["razon"]}</div>')
             if badge == "escalar_humano" and ultima_decision.get("resumen"):
-                detalle_html += f"""
-          <div class="field-label">Resumen para el agente</div>
-          <div class="field-value">{ultima_decision['resumen']}</div>
-                """
+                partes_detalle.append('<div class="field-label">Resumen para el agente</div>')
+                partes_detalle.append(f'<div class="field-value">{ultima_decision["resumen"]}</div>')
         if lead_detalle.get("monto_deuda") or lead_detalle.get("tipo_deuda"):
             monto_fmt, tipo_fmt, interes_fmt = _formatear_precalificacion(lead_detalle)
-            detalle_html += f"""
-          <div class="field-label">Pre-calificación</div>
-          <div class="field-value">Monto: {monto_fmt} · Tipo de deuda: {tipo_fmt} · Interés en Consejero: {interes_fmt}</div>
-            """
-        detalle_html += f"""
-          <div class="field-label">Etapa actual en el CRM</div>
-          <div class="field-value">{lead_detalle['stage']}</div>
-        </div>
-        """
-        st.markdown(detalle_html, unsafe_allow_html=True)
+            partes_detalle.append('<div class="field-label">Pre-calificación</div>')
+            partes_detalle.append(
+                f'<div class="field-value">Monto: {monto_fmt} · Tipo de deuda: {tipo_fmt} · '
+                f'Interés en Consejero: {interes_fmt}</div>'
+            )
+        partes_detalle.append('<div class="field-label">Etapa actual en el CRM</div>')
+        partes_detalle.append(f'<div class="field-value">{lead_detalle["stage"]}</div>')
+        partes_detalle.append("</div>")
+        st.markdown("".join(partes_detalle), unsafe_allow_html=True)
 
         if ultimo_draft:
             st.markdown(
