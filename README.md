@@ -11,6 +11,11 @@ contenido) son generados, no reales.
 
 ## Setup (menos de 15 minutos)
 
+**Un solo clic (Windows):** doble clic en [`demo.bat`](demo.bat) — crea el
+entorno si hace falta, instala dependencias, corre los tests, corre
+`cli.py demo` en consola y al final abre el panel solo. Equivale a los
+5 pasos de abajo, sin escribir ningún comando.
+
 ```bash
 # 1. Crear entorno e instalar dependencias
 python -m venv .venv
