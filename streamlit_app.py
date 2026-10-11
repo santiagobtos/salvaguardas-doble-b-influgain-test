@@ -16,7 +16,7 @@ import streamlit as st
 import yaml
 
 from src import crm_automation, db, reporting
-from src.content_system import generar_guiones
+from src.content_system import _cargar_fuentes, generar_guiones
 from src.prequalification_agent import procesar_mensaje_entrante
 
 RULES_PATH = Path(__file__).resolve().parent / "rules" / "rules.yaml"
@@ -64,6 +64,21 @@ h1, h2, h3 { font-family: 'Inter', sans-serif !important; font-weight: 800 !impo
 .lead-card .field-value { font-size:14px; color: var(--ink); margin-top:2px; }
 .top-banner { background: var(--gray-tint); color: var(--ink-soft); font-size: 12.5px; padding: 8px 14px; margin-top: 2.2rem; margin-bottom: 10px; border-radius: 8px; text-align: center; }
 .top-banner b { color: var(--ink); }
+.funnel-row { margin-bottom: 14px; }
+.funnel-label { display:flex; justify-content:space-between; align-items:baseline; font-size:13px; margin-bottom:5px; }
+.funnel-stage { font-weight:600; color: var(--ink); }
+.funnel-count { font-weight:700; color: var(--ink); font-variant-numeric: tabular-nums; }
+.funnel-delta { font-weight:500; color: var(--ink-muted); font-size:11.5px; margin-left:6px; }
+.funnel-track { background: var(--gray-tint); border-radius:8px; height:32px; overflow:hidden; }
+.funnel-bar { height:100%; border-radius:8px; background: var(--brand); }
+.flow-step { display:flex; gap:16px; }
+.flow-dot-col { display:flex; flex-direction:column; align-items:center; }
+.flow-dot { width:28px; height:28px; border-radius:50%; background: var(--brand); color:#fff; font-weight:700; font-size:13px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.flow-line { width:2px; flex:1; min-height:22px; background: var(--border); margin-top:4px; }
+.flow-body { flex:1; padding-top:2px; padding-bottom:22px; }
+.flow-title { font-weight:700; font-size:14.5px; color: var(--ink); margin-bottom:2px; }
+.flow-desc { font-size:12.8px; color: var(--ink-soft); margin-bottom:7px; max-width:60ch; }
+.flow-stat { display:inline-block; background: var(--brand-tint); color: var(--brand-dark); font-size:12px; font-weight:600; padding:3px 10px; border-radius:999px; }
 .topbar-brand { font-size: 17px; font-weight: 800; padding-top: 6px; }
 .topbar-brand .topbar-sub { color: var(--ink-muted); font-weight: 400; font-size: 12.5px; margin-left: 6px; }
 div[data-testid="stTabs"] button[role="tab"] p { font-size: 14px; font-weight: 600; }
@@ -594,20 +609,51 @@ with tab_inicio:
     c4.metric("Tasa de transferencia (histórico)", f"{funnel_hist['tasa_transferencia_pct']}%")
 
     st.markdown("---")
-    st.subheader("Qué hace cada pestaña")
-    cc1, cc2, cc3, cc4 = st.columns(4)
-    with cc1:
-        st.markdown("**Leads que llegan (A)**")
-        st.caption("30% — Ingesta y clasifica cada mensaje nuevo solo: responder, ignorar o escalar a un humano.")
-    with cc2:
-        st.markdown("**B · CRM y disposiciones**")
-        st.caption("30% — Aplica disposiciones, mueve etapas, genera borradores de WhatsApp y maneja fallos.")
-    with cc3:
-        st.markdown("**C · Datos y reporting**")
-        st.caption("25% — Limpia el CSV sucio del partner, calcula el funnel y qué rompería comisiones.")
-    with cc4:
-        st.markdown("**D · Contenido**")
-        st.caption("15% — Genera guiones cortos priorizados, cada uno trazable a una fuente real.")
+    st.subheader("Cómo fluye un lead por el sistema")
+    st.caption("Las 4 pestañas no son 4 herramientas sueltas — son el mismo lead avanzando. Esto es lo que pasa en cada paso, con los números de ahora mismo.")
+
+    n_responder = sum(1 for d in decisiones if d["decision"] == "responder")
+    n_escalar = sum(1 for d in decisiones if d["decision"] == "escalar_humano")
+    n_ignorar = sum(1 for d in decisiones if d["decision"] == "ignorar")
+    n_manejados = sum(1 for l in leads_vivo if l["stage"] != "Nuevo")
+    n_fuentes = len(_cargar_fuentes())
+
+    FLUJO = [
+        (
+            "Leads que llegan", "A",
+            "Cada mensaje nuevo se clasifica solo: responder, ignorar o escalar a un humano — nunca se publica ni transfiere nada sin revisión.",
+            f"{len(decisiones)} mensajes clasificados · {n_responder} para responder, {n_escalar} escalados, {n_ignorar} ignorados",
+        ),
+        (
+            "B · CRM y disposiciones", "B",
+            "Un humano revisa el borrador y aplica una disposición; el sistema mueve la etapa, redacta el WhatsApp y deja auditoría.",
+            f"{n_manejados} de {len(leads_vivo)} leads ya con una disposición aplicada",
+        ),
+        (
+            "C · Datos y reporting", "C",
+            "El mismo recorrido, visto en el dataset de inscripciones del partner (limpio): de lead a inscripción activa.",
+            f"{funnel_hist['tasa_transferencia_pct']}% de los pre-calificados llegan a transferirse al partner",
+        ),
+        (
+            "D · Contenido", "D",
+            "Las preguntas y objeciones más repetidas de esos mismos leads alimentan guiones priorizados para nuevo contenido.",
+            f"3 guiones priorizados de {n_fuentes} fuentes de contenido",
+        ),
+    ]
+
+    for i, (titulo, letra, desc, stat) in enumerate(FLUJO):
+        es_ultimo = i == len(FLUJO) - 1
+        st.markdown(
+            f"""<div class="flow-step">
+            <div class="flow-dot-col"><div class="flow-dot">{letra}</div>{'' if es_ultimo else '<div class="flow-line"></div>'}</div>
+            <div class="flow-body">
+                <div class="flow-title">{titulo}</div>
+                <div class="flow-desc">{desc}</div>
+                <span class="flow-stat">{stat}</span>
+            </div>
+            </div>""",
+            unsafe_allow_html=True,
+        )
 
     st.markdown("---")
     st.caption(
@@ -891,13 +937,28 @@ with tab_c:
             st.markdown(f"- {n}")
 
         funnel = reporting.calcular_funnel(leads_c, enroll_limpio)["general"]
-        st.markdown("#### Métricas del funnel")
-        f1, f2, f3, f4 = st.columns(4)
-        f1.metric("Leads totales", funnel["leads_totales"])
-        f2.metric("Pre-calificados", funnel["pre_calificados"])
-        f3.metric("Transferidos", funnel["transferidos"])
-        f4.metric("Inscritos activos", funnel["inscritos_activos"])
-        st.progress(min(funnel["tasa_transferencia_pct"] / 100, 1.0), text=f"Tasa de transferencia: {funnel['tasa_transferencia_pct']}%")
+        st.markdown("#### Funnel: de lead a inscripción activa")
+
+        total = funnel["leads_totales"] or 1
+        pct_prequalif = round(100 * funnel["pre_calificados"] / total, 1)
+        ETAPAS_FUNNEL = [
+            ("Leads totales", funnel["leads_totales"], 100.0, None),
+            ("Pre-calificados", funnel["pre_calificados"], 100 * funnel["pre_calificados"] / total, pct_prequalif),
+            ("Transferidos", funnel["transferidos"], 100 * funnel["transferidos"] / total, funnel["tasa_transferencia_pct"]),
+            ("Inscritos activos", funnel["inscritos_activos"], 100 * funnel["inscritos_activos"] / total, funnel["tasa_inscripcion_pct"]),
+        ]
+        filas_funnel = []
+        for i, (etapa, valor, ancho_pct, delta_pct) in enumerate(ETAPAS_FUNNEL):
+            delta_html = f'<span class="funnel-delta">{delta_pct}% vs. etapa anterior</span>' if delta_pct is not None else ""
+            opacidad = 1 - i * 0.18
+            filas_funnel.append(
+                f"""<div class="funnel-row">
+                <div class="funnel-label"><span class="funnel-stage">{etapa}</span>
+                <span class="funnel-count">{valor}{delta_html}</span></div>
+                <div class="funnel-track"><div class="funnel-bar" style="width:{ancho_pct}%; opacity:{opacidad:.2f};"></div></div>
+                </div>"""
+            )
+        st.markdown("".join(filas_funnel), unsafe_allow_html=True)
 
         estancados = reporting.leads_estancados(leads_c, enroll_limpio)
         st.markdown(f"#### Leads estancados ({len(estancados)})")
