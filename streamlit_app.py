@@ -946,7 +946,13 @@ def _sugerir_disposicion(valor_invalido):
 # ======================================================================= #
 # EJERCICIO B — MÓDULO 1                                                   #
 # ======================================================================= #
-with tab_b:
+@st.fragment(run_every="5s")
+def tab_b_fragment():
+    """Todo el contenido de la pestaña B en un fragmento que se vuelve a
+    evaluar solo cada 5s — así, si llega un lead nuevo (del auto-generador
+    de la pestaña A, de un alta manual, o del webhook), las tablas y
+    contadores de acá se actualizan sin que el usuario tenga que hacer
+    clic en nada."""
     st.markdown('<span class="eyebrow">Ejercicio B · 30%</span>', unsafe_allow_html=True)
     st.header("Nadie se pierde en la fila, ni siquiera cuando algo falla")
     st.markdown(
@@ -1040,8 +1046,8 @@ with tab_b:
     if e2.button("Simular transferencia sin teléfono"):
         db.upsert_lead("SIM-NOPHONE", datetime.now(timezone.utc).isoformat(), "@demo", "CTWA", "lead de prueba sin teléfono", None, "responder")
         r = crm_automation.aplicar_disposicion("SIM-NOPHONE", "Transferido")
-        st.warning(f"SIM-NOPHONE: sin teléfono → queda en **{r.get('stage')}** y se le pidió el dato por WhatsApp.")
-        st.rerun()
+        st.toast(f"SIM-NOPHONE: sin teléfono → queda en {r.get('stage')} y se le pidió el dato por WhatsApp.", icon="⚠️")
+        st.rerun(scope="fragment")
     if e3.button("Simular disposición inválida"):
         # Un lead real, al azar (no siempre el mismo) y que no tenga ya un
         # borrador sin revisar bloqueando el camino — si no, "Corregir y
@@ -1054,8 +1060,8 @@ with tab_b:
         lead_objetivo = random.choice(pool_leads)["lead_id"] if pool_leads else "N/A"
         valor_invalido, _sugerida = random.choice(_DISPOSICIONES_INVALIDAS_POOL)
         r = crm_automation.aplicar_disposicion(lead_objetivo, valor_invalido)
-        st.error(f"{lead_objetivo}: llegó \"{valor_invalido}\" → {r}")
-        st.rerun()
+        st.toast(f"{lead_objetivo}: llegó \"{valor_invalido}\" → cola de fallos.", icon="⚠️")
+        st.rerun(scope="fragment")
 
     st.markdown("#### Cola de fallos (dead-letter queue)")
     st.caption("Un fallo resuelto o fallido_permanente no se borra de esta lista — queda como constancia de que pasó, nunca desaparece en silencio.")
@@ -1063,8 +1069,8 @@ with tab_b:
         resultados = crm_automation.reintentar_fallos()
         resueltos = [r for r in resultados if r["status"] == "resuelto"]
         if resueltos:
-            st.success(f"{len(resueltos)} fallo(s) resueltos al reintentar: {', '.join(r['lead_id'] for r in resueltos)}.")
-        st.rerun()
+            st.toast(f"{len(resueltos)} fallo(s) resueltos al reintentar: {', '.join(r['lead_id'] for r in resueltos)}.", icon="✅")
+        st.rerun(scope="fragment")
 
     fallos = db.listar_fallos()
     if fallos:
@@ -1158,9 +1164,13 @@ with tab_b:
                             )
                         else:
                             st.toast(f"Resultado: {r}", icon="⚠️")
-                        st.rerun()
+                        st.rerun(scope="fragment")
     else:
         st.caption("Sin fallos — ni pendientes, ni históricos.")
+
+
+with tab_b:
+    tab_b_fragment()
 
 # ======================================================================= #
 # EJERCICIO C — MÓDULO 2                                                   #
