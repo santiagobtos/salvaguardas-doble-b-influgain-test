@@ -87,3 +87,4 @@ ni tocar `src/`.
 - [`NOTA_ESCALA.md`](NOTA_ESCALA.md) — cómo escalaría esto a ~200 leads/hora.
 - [`NOTA_IA.md`](NOTA_IA.md) — cómo se usó IA para construir este sistema.
 - [`DECISIONES.md`](DECISIONES.md) — qué no se construyó a propósito.
+- [`RUPTURA_COMISIONES.md`](RUPTURA_COMISIONES.md) — qué rompería el pago de comisiones (Ejercicio C).

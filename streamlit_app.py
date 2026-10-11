@@ -71,11 +71,34 @@ def _formatear_precalificacion(lead):
     return monto_fmt, tipo_fmt, interes_fmt
 
 
-def _colorear_fila_sin_telefono(row, sin_telefono=frozenset()):
-    """Resalta en rosa toda la fila de un lead sin teléfono — mismo color
-    que ya usa el sistema para la etapa 'Pendiente de Teléfono' en otras
-    tablas, para que se note de un vistazo sin tener que abrir el lead."""
-    bg = "#fde2e1" if row.get("ID") in sin_telefono else ""
+def _leads_con_fallo_pendiente():
+    """IDs de leads con un fallo todavía sin resolver en la cola de
+    errores — así se puede resaltar en las tablas de leads que ese ID
+    tiene algo pendiente ahí, en vez de que la cola de fallos y la lista
+    de leads parezcan dos cosas sin relación."""
+    ids = set()
+    for f in db.listar_fallos():
+        if f["status"] != "pending_retry":
+            continue
+        payload = json.loads(f["payload_json"]) if f["payload_json"] else {}
+        lead_id = payload.get("lead_id")
+        if lead_id:
+            ids.add(lead_id)
+    return ids
+
+
+def _colorear_fila_a(row, sin_telefono=frozenset(), con_fallo=frozenset()):
+    """Resalta toda la fila: ámbar si el lead tiene un fallo pendiente en
+    la cola de errores (más urgente — algo activo sin resolver), rosa si
+    solo le falta el teléfono — mismos colores que ya usa el sistema para
+    esos dos casos en otras tablas."""
+    lead_id = row.get("ID")
+    if lead_id in con_fallo:
+        bg = "#fef3dc"
+    elif lead_id in sin_telefono:
+        bg = "#fde2e1"
+    else:
+        bg = ""
     return [f"background-color:{bg}" if bg else "" for _ in row.index]
 
 st.set_page_config(
@@ -308,6 +331,7 @@ def stack_fragment():
 
     leads_actuales = db.listar_leads()
     st.markdown(f"**Stack de leads** &nbsp;·&nbsp; {len(leads_actuales)} en total &nbsp;·&nbsp; <span style='color:var(--ink-muted); font-weight:400; font-size:12.5px;'>clic en una fila para ver el detalle</span>", unsafe_allow_html=True)
+    st.caption("Filas en ámbar: el lead tiene un fallo pendiente en la cola de errores (pestaña B). Filas en rosa: sin teléfono.")
 
     if not leads_actuales:
         st.info("Sin leads todavía.")
@@ -322,9 +346,10 @@ def stack_fragment():
         "creador": "Creador", "canal": "Canal", "hora": "Hora",
     })
     leads_sin_telefono_a = set(df_stack.loc[df_stack["telefono"].isna() | (df_stack["telefono"] == ""), "lead_id"])
+    leads_con_fallo_a = _leads_con_fallo_pendiente()
 
     evento = st.dataframe(
-        df_view.style.apply(_colorear_fila_sin_telefono, sin_telefono=leads_sin_telefono_a, axis=1),
+        df_view.style.apply(_colorear_fila_a, sin_telefono=leads_sin_telefono_a, con_fallo=leads_con_fallo_a, axis=1),
         use_container_width=True,
         hide_index=True,
         height=430,
@@ -736,7 +761,7 @@ with tab_inicio:
 
     st.markdown("---")
     st.caption(
-        "Documentos complementarios en el repo: README.md · NOTA_ESCALA.md · NOTA_IA.md · DECISIONES.md"
+        "Documentos complementarios en el repo: README.md · NOTA_ESCALA.md · NOTA_IA.md · DECISIONES.md · RUPTURA_COMISIONES.md"
     )
 
 # ======================================================================= #
@@ -832,17 +857,23 @@ _COLOR_ETAPA = {
 }
 
 
-def _colorear_fila_b(row, sin_telefono=frozenset()):
+def _colorear_fila_b(row, sin_telefono=frozenset(), con_fallo=frozenset()):
     # Las celdas que ya tienen su propio color (Decisión, Etapa actual) lo
-    # conservan; el resto de la fila se tiñe del mismo rosa de "problema
-    # de teléfono" que ya usa la etapa Pendiente de Teléfono, para que un
-    # lead sin teléfono se note de un vistazo sin tener que abrirlo.
-    es_sin_tel = row.get("ID") in sin_telefono
+    # conservan; el resto de la fila se tiñe de ámbar si el lead tiene un
+    # fallo pendiente en la cola de errores (más urgente), o del mismo
+    # rosa de "problema de teléfono" que ya usa la etapa Pendiente de
+    # Teléfono si solo le falta el dato — para que se note de un vistazo
+    # sin tener que abrir el lead.
+    lead_id = row.get("ID")
+    es_con_fallo = lead_id in con_fallo
+    es_sin_tel = lead_id in sin_telefono
     estilos = []
     for col in row.index:
         bg = _COLOR_DECISION.get(row[col]) if col == "Decisión" else None
         bg = _COLOR_ETAPA.get(row[col]) if col == "Etapa actual" else bg
-        if bg is None and es_sin_tel:
+        if bg is None and es_con_fallo:
+            bg = "#fef3dc"
+        elif bg is None and es_sin_tel:
             bg = "#fde2e1"
         estilos.append(f"background-color:{bg}" if bg else "")
     return estilos
@@ -933,7 +964,8 @@ with tab_b:
             "stage": "Etapa actual", "creador": "Creador", "canal": "Canal",
         })
         leads_sin_telefono = {l["lead_id"] for l in leads if not l.get("telefono")}
-        st.caption("Haz clic en una fila para ver el detalle completo en una ventana emergente. Las filas en rosa son leads sin teléfono.")
+        leads_con_fallo = _leads_con_fallo_pendiente()
+        st.caption("Haz clic en una fila para ver el detalle completo en una ventana emergente. Filas en ámbar: fallo pendiente en la cola de errores. Filas en rosa: sin teléfono.")
 
         GRUPOS_ETAPA = [
             ("No manejadas", ["Nuevo"], "tabla_b_no_manejadas"),
@@ -953,7 +985,7 @@ with tab_b:
                 # para ocupar toda la pantalla en vez de dejarla con el mismo
                 # tamaño chico y el resto en blanco.
                 evento = st.dataframe(
-                    subset.style.apply(_colorear_fila_b, sin_telefono=leads_sin_telefono, axis=1),
+                    subset.style.apply(_colorear_fila_b, sin_telefono=leads_sin_telefono, con_fallo=leads_con_fallo, axis=1),
                     use_container_width=True,
                     hide_index=True,
                     on_select="rerun",
@@ -1229,10 +1261,20 @@ with tab_c:
             "sin_atribuir" genérico, o al creador equivocado por un teléfono mal capturado) o de menos
             (negando una comisión legítima porque el sistema no logra cruzar el lead con su inscripción).
             Por eso esta limpieza no es un paso cosmético: es la diferencia entre un reporte financiero
-            confiable y uno que esconde errores de atribución.
+            confiable y uno que esconde errores de atribución. Análisis completo en
+            <code>RUPTURA_COMISIONES.md</code> (en la raíz del repo).
             </div>""",
             unsafe_allow_html=True,
         )
+        if comisiones["ejemplos_mismatch"]:
+            st.markdown("**Ejemplos de teléfono que no coincide (lead original vs. inscripción):**")
+            st.dataframe(
+                pd.DataFrame(comisiones["ejemplos_mismatch"]).rename(columns={
+                    "enrollment_id": "Inscripción", "lead_id": "Lead",
+                    "telefono_lead": "Teléfono del lead", "telefono_normalizado": "Teléfono en la inscripción",
+                }),
+                use_container_width=True, hide_index=True,
+            )
 
 # ======================================================================= #
 # EJERCICIO D                                                              #
