@@ -61,9 +61,12 @@ python cli.py demo
 
 echo.
 echo ------------------------------------------------------------
-echo Demo de consola terminada. Abriendo el panel en el navegador
-echo en 5 segundos...
+echo Demo de consola terminada. Esos 3 leads de prueba (L901/L902/
+echo L903) fueron solo para mostrar el flujo en consola -- se
+echo reinicia la base antes de abrir el panel, para que el
+echo evaluador arranque de cero, no con eso ya montado.
 echo ------------------------------------------------------------
+python -c "from src import db; db.init_db(); db.reset_db()"
 ping -n 6 127.0.0.1 >nul
 
 echo.
