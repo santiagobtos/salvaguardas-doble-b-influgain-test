@@ -223,7 +223,23 @@ def listar_audit_trail():
 
 
 def encolar_fallo(timestamp, tipo, payload, error):
+    """Si el mismo lead ya tiene un fallo del mismo tipo esperando
+    reintento, no se mete un duplicado — es el mismo problema sin resolver
+    todavía, no uno nuevo. Sin esto, cada clic que vuelve a fallar (ej. el
+    checkbox de simular webhook caído, o reintentar algo que sigue mal)
+    metía una fila más a la cola para el mismo caso."""
     conn = get_connection()
+    lead_id = payload.get("lead_id")
+    if lead_id:
+        pendientes = conn.execute(
+            "SELECT id, payload_json FROM failed_queue WHERE tipo=? AND status='pending_retry'",
+            (tipo,),
+        ).fetchall()
+        for row in pendientes:
+            payload_existente = json.loads(row["payload_json"]) if row["payload_json"] else {}
+            if payload_existente.get("lead_id") == lead_id:
+                conn.close()
+                return
     conn.execute(
         "INSERT INTO failed_queue (timestamp, tipo, payload_json, error) VALUES (?, ?, ?, ?)",
         (timestamp, tipo, json.dumps(payload, ensure_ascii=False), error),
