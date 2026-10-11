@@ -30,7 +30,13 @@ fuera, y por qué:
 - **El reporting (Ejercicio C) usa los CSV fijos, no la base SQLite en
   vivo.** Es intencional: la prueba pide reporting sobre datos sucios como
   insumo separado, no sobre el estado transaccional del CRM corriendo en
-  esta demo.
+  esta demo. Aun así, `data/leads.csv` no es una etiqueta inventada aparte:
+  `scripts/generate_fake_data.py` pasa cada mensaje por el mismo motor de
+  reglas del Ejercicio A (`src/rules_engine.clasificar_mensaje` +
+  `rules/rules.yaml`) para decidir `estado_inicial`, así que sí refleja lo
+  que el agente real decidiría con esos mensajes — lo único que no sale
+  del motor es "Nuevo" (un lead recién llegado que nadie ha procesado
+  todavía, que es un estado temporal, no una clasificación).
 
 - **Sin un LLM en vivo redactando los mensajes.** Lo evalué y decidí no
   conectar una API de IA generativa (tipo Claude/OpenAI) para los borradores

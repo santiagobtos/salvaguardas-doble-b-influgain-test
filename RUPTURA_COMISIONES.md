@@ -19,7 +19,7 @@ El teléfono que capturó el partner en la inscripción no es el mismo que el le
 
 | enrollment_id | lead_id | teléfono del lead | teléfono en la inscripción |
 |---|---|---|---|
-| E001 | L020 | 3000000020 | 3001122 |
+| E001 | L021 | 3000000021 | 3001122 |
 | E002 | L036 | 3000000036 | 30112 |
 | E003 | L009 | 3000000009 | 3000000996 |
 | E004 | L025 | 3000000025 | 3000000995 |

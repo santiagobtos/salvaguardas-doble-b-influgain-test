@@ -2,16 +2,28 @@
 
 Reproducible (seed fija). No usa ninguna API ni dato real: todo inventado.
 Correr: python scripts/generate_fake_data.py
+
+El estado inicial de cada lead (Respondido/Escalado/Ignorado) no se
+asigna al azar: se calcula pasando el mensaje de verdad por el mismo
+motor de reglas que usa el Ejercicio A en vivo (src/rules_engine +
+rules/rules.yaml) — así data/leads.csv refleja lo que el agente real
+decidiría, no una etiqueta inventada aparte.
 """
 import csv
 import json
 import random
+import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+REPO_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(REPO_ROOT))
+
+from src.rules_engine import clasificar_mensaje, load_rules  # noqa: E402
+
 random.seed(42)
 
-DATA_DIR = Path(__file__).resolve().parent.parent / "data"
+DATA_DIR = REPO_ROOT / "data"
 DATA_DIR.mkdir(exist_ok=True)
 
 CREADORES = ["@carla.finanzas", "@juanfi_libre", "@manu.deudas", "@laura_consejos", "@pedro.ahorra"]
@@ -46,7 +58,16 @@ MENSAJES_SIN_MONTO = [
     "Hola vi el anuncio, me pueden contar mas",
 ]
 
-ESTADOS_INICIALES_PESOS = [("Nuevo", 5), ("Respondido", 5), ("Escalado", 2), ("Ignorado", 2)]
+# "Nuevo" es el único estado que NO sale del motor de reglas: representa
+# un lead que llegó pero todavía nadie (ni el agente) lo ha procesado,
+# así que una fracción se deja así a propósito en vez de clasificarlo.
+PROB_NUEVO_SIN_PROCESAR = 5 / 14  # misma proporción que tenía el peso viejo
+
+_DECISION_A_ESTADO = {
+    "responder": "Respondido",
+    "escalar_humano": "Escalado",
+    "ignorar": "Ignorado",
+}
 
 
 def _telefono_falso(i):
@@ -60,6 +81,7 @@ def _fecha_aleatoria(dias_atras_max=12):
 
 
 def generar_leads(n=42):
+    rules = load_rules()
     filas = []
     for i in range(1, n + 1):
         lead_id = f"L{i:03d}"
@@ -77,10 +99,11 @@ def generar_leads(n=42):
             mensaje = random.choice(MENSAJES_SIN_MONTO)
 
         telefono = _telefono_falso(i)
-        estado_inicial = random.choices(
-            [e for e, _ in ESTADOS_INICIALES_PESOS],
-            weights=[w for _, w in ESTADOS_INICIALES_PESOS],
-        )[0]
+        if random.random() < PROB_NUEVO_SIN_PROCESAR:
+            estado_inicial = "Nuevo"  # llegó, todavía nadie lo procesó
+        else:
+            decision, _razon = clasificar_mensaje(mensaje, rules)
+            estado_inicial = _DECISION_A_ESTADO[decision]
         timestamp = _fecha_aleatoria().isoformat()
 
         filas.append(
