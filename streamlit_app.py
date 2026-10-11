@@ -17,7 +17,7 @@ import streamlit as st
 import yaml
 
 from src import crm_automation, db, reporting
-from src.content_system import MINIMO_EVIDENCIA, generar_guiones
+from src.content_system import MINIMO_EVIDENCIA, analizar_fuentes_contenido, generar_guiones
 from src.prequalification_agent import procesar_mensaje_entrante
 
 RULES_PATH = Path(__file__).resolve().parent / "rules" / "rules.yaml"
@@ -1373,13 +1373,27 @@ with tab_d:
     st.markdown('<span class="eyebrow">Ejercicio D · 15%</span>', unsafe_allow_html=True)
     st.header("Guiones que nacen de los leads reales, no de una lista inventada")
     st.markdown(
-        '<p class="lede">Los 3 problemas de abajo no son una lista de objeciones genéricas: salen '
-        "de clasificar los 42 mensajes reales de <code>data/leads.csv</code> (los mismos leads del "
-        "Ejercicio A/C) contra categorías editables en <code>rules.yaml</code>. Cada guion queda "
-        f"respaldado por al menos {MINIMO_EVIDENCIA} leads concretos, no por un número inventado.</p>",
+        '<p class="lede">El enunciado pide 8–12 "fuentes de contenido" (preguntas, objeciones o '
+        "tendencias). Aquí salen de clasificar los 42 mensajes reales de <code>data/leads.csv</code> "
+        "(los mismos leads del Ejercicio A/C) contra categorías editables en <code>rules.yaml</code> — "
+        "no de inventarlas a mano. Esas fuentes se agrupan en 3 guiones, cada uno respaldado por al "
+        f"menos {MINIMO_EVIDENCIA} leads concretos.</p>",
         unsafe_allow_html=True,
     )
 
+    fuentes_d = analizar_fuentes_contenido()
+    st.markdown(f"#### Fuentes de contenido ({len(fuentes_d)})")
+    st.dataframe(
+        pd.DataFrame(fuentes_d)[["nombre", "frecuencia", "urgencia", "leads_con_senal_riesgo", "prioridad_score", "guion"]]
+        .rename(columns={
+            "nombre": "Fuente (pregunta/objeción/tendencia)", "frecuencia": "Leads",
+            "urgencia": "Urgencia", "leads_con_senal_riesgo": "Con señal de riesgo",
+            "prioridad_score": "Score (leads × peso urgencia)", "guion": "Alimenta el guion",
+        }),
+        use_container_width=True, hide_index=True,
+    )
+
+    st.markdown("#### Guiones (fuentes agrupadas por problema)")
     guiones_d = generar_guiones()
 
     for g in guiones_d:
@@ -1388,6 +1402,7 @@ with tab_d:
             if g["evidencia_suficiente"]
             else f"⚠ solo {g['n_leads']} leads — por debajo del mínimo de {MINIMO_EVIDENCIA}"
         )
+        fuentes_txt = ", ".join(f"{f['nombre']} ({f['frecuencia']})" for f in g["fuentes"] if f["frecuencia"] > 0)
         st.markdown(
             f"""<div class="script-card">
             <div class="strip"><span>{g['problema']}</span><span>score {g['prioridad_score']} · {g['duracion_estimada_seg']}s</span></div>
@@ -1395,16 +1410,15 @@ with tab_d:
             </div>""",
             unsafe_allow_html=True,
         )
-        st.caption(
-            f"{badge_evidencia} · {g['leads_con_senal_riesgo']} con señal de riesgo legal explícita "
-            f"({g['riesgo_pct']}%) · clasificado por las keywords: {', '.join(g['keywords']) if g['keywords'] else '(catch-all: el resto de los leads)'}"
-        )
+        st.caption(f"{badge_evidencia} · {g['leads_con_senal_riesgo']} con señal de riesgo legal explícita ({g['riesgo_pct']}%) · fuentes: {fuentes_txt}")
         with st.expander(f"📊 Ver informe y evidencia ({g['n_leads']} leads)"):
+            n_fuentes_con_datos = sum(1 for f in g["fuentes"] if f["frecuencia"] > 0)
             st.markdown(
-                f"**{g['n_leads']} de 42 leads reales** caen en esta categoría — "
+                f"**{g['n_leads']} de 42 leads reales** caen en este guion, sumando "
+                f"**{n_fuentes_con_datos} fuentes** de la tabla de arriba — "
                 f"**{g['leads_con_senal_riesgo']}** de ellos además mencionan una palabra de riesgo "
-                "legal (`escalar_keywords` en rules.yaml), lo que sube su prioridad: "
-                f"`score = n_leads × (1 + % riesgo) = {g['prioridad_score']}`."
+                "legal (`escalar_keywords` en rules.yaml). `score = Σ (leads × peso_urgencia)` de cada "
+                f"fuente que lo alimenta = {g['prioridad_score']}."
             )
             st.dataframe(
                 pd.DataFrame(g["evidencia"]).rename(columns={

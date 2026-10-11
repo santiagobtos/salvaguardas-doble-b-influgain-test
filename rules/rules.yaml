@@ -63,20 +63,51 @@ leads_estancados_dias: 2
 # promete al lead ni al creador.
 comision_pct_estimada: 20
 
-# Ejercicio D: categorías de contenido. Cada mensaje real de data/leads.csv
-# se clasifica en la PRIMERA categoría de esta lista cuyas keywords
-# aparecen en el mensaje — así un lead con varias señales no se cuenta dos
-# veces. La última categoría debe quedar con keywords vacías: es el
-# "catch-all" que recoge todo lo que no matcheó antes (hoy: riesgo legal,
-# deudas de libranza/hipoteca, y quien se quiere dar de baja). Cambiar
-# estas listas cambia de qué habla el Ejercicio D sin tocar código.
+# Ejercicio D: "Fuentes de contenido" (8-12 ítems: preguntas de leads,
+# objeciones o tendencias) — igual que pedía el enunciado original, pero en
+# vez de inventarlas a mano, cada una se mide sobre los mensajes REALES de
+# data/leads.csv. Cada mensaje se clasifica en la PRIMERA fuente de esta
+# lista cuyas keywords aparecen en el texto — así un lead con varias
+# señales no se cuenta dos veces. La última fuente debe quedar con
+# keywords vacías: es el catch-all para lo que no matcheó antes. `guion`
+# agrupa varias fuentes en uno de los 3 guiones finales (friccion_informacion
+# / deuda_tarjeta_consumo / riesgo_y_desconfianza) para que cada guion tenga
+# evidencia suficiente (mínimo 12 leads). Cambiar esto cambia de qué habla
+# el Ejercicio D sin tocar código.
 categorias_contenido:
-  - id: friccion_informacion
-    nombre: "Piden información pero no dan el siguiente paso"
-    keywords: ["informacion", "información", "consejeria", "consejería", "contar mas", "contar más", "como funciona", "cómo funciona"]
-  - id: deuda_tarjeta_consumo
-    nombre: "Deuda de tarjeta/consumo y no saber por dónde empezar"
-    keywords: ["tarjeta", "consumo", "varias deudas"]
-  - id: riesgo_y_desconfianza
-    nombre: "Riesgo legal/embargo, deudas de libranza o vivienda, y señales de abandono"
+  - id: riesgo_legal
+    nombre: "Riesgo legal explícito (demanda, embargo, amenaza, quiebra)"
+    guion: riesgo_y_desconfianza
+    keywords: ["demanda", "abogado", "embargo", "amenaza", "quiebra", "fraude", "denuncia"]
+  - id: abandono_desconfianza
+    nombre: "Se quieren dar de baja o sienten que esto es spam"
+    guion: riesgo_y_desconfianza
+    keywords: ["no me interesa", "quitame", "quítame", "dame de baja", "dejen de escribir", "spam", "no vuelvan a escribir"]
+  - id: info_general
+    nombre: "Piden información del programa sin dar el siguiente paso"
+    guion: friccion_informacion
+    keywords: ["informacion", "información", "consejeria", "consejería", "como funciona", "cómo funciona", "contar mas", "contar más"]
+  - id: tarjeta_credito
+    nombre: "Deuda de tarjeta de crédito"
+    guion: deuda_tarjeta_consumo
+    keywords: ["tarjeta", "tdc"]
+  - id: libre_inversion_consumo
+    nombre: "Crédito de consumo o libre inversión"
+    guion: deuda_tarjeta_consumo
+    keywords: ["consumo", "libre inversion", "libre inversión"]
+  - id: varias_deudas
+    nombre: "Varias deudas juntas, no saben por dónde empezar"
+    guion: deuda_tarjeta_consumo
+    keywords: ["varias deudas"]
+  - id: libranza_nomina
+    nombre: "Deuda de libranza/nómina, piden asesoría puntual"
+    guion: riesgo_y_desconfianza
+    keywords: ["libranza", "nomina", "nómina"]
+  - id: hipotecario
+    nombre: "Deuda hipotecaria, riesgo de perder la vivienda"
+    guion: riesgo_y_desconfianza
+    keywords: ["hipoteca", "hipotecaria"]
+  - id: otros
+    nombre: "Otros (sin patrón claro todavía)"
+    guion: riesgo_y_desconfianza
     keywords: []

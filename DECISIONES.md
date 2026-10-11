@@ -38,14 +38,18 @@ fuera, y por qué:
   del motor es "Nuevo" (un lead recién llegado que nadie ha procesado
   todavía, que es un estado temporal, no una clasificación).
 
-- **El Ejercicio D dejó de usar `content_sources.json`.** La primera versión
-  generaba los 3 guiones a partir de un archivo de "fuentes de contenido"
-  con frecuencia/urgencia inventadas a mano. Se cambió a clasificar los 42
-  mensajes reales de `data/leads.csv` contra categorías editables en
-  `rules.yaml` (`categorias_contenido`), así cada guion queda respaldado
-  por leads concretos (mínimo 12 cada uno) en vez de un número que nadie
-  puede auditar. El archivo `content_sources.json` se conserva en el repo
-  (lo pide el enunciado original) pero ya no alimenta nada.
+- **El Ejercicio D dejó de usar `content_sources.json`.** El enunciado
+  original pide 8-12 "fuentes de contenido" (preguntas de leads, objeciones
+  o tendencias) — el primer intento las inventaba a mano en un JSON con
+  frecuencia/urgencia ficticias. Se cambió a dos capas, ambas sobre
+  `data/leads.csv` (los mismos leads de A/C): `analizar_fuentes_contenido()`
+  clasifica los 42 mensajes reales contra 8-12 fuentes editables en
+  `rules.yaml` (`categorias_contenido`) — mismo formato que pedía el
+  enunciado (pregunta/objeción/tendencia + frecuencia + urgencia), pero
+  medido, no inventado — y `generar_guiones()` las agrupa (campo `guion` de
+  cada fuente) en los 3 guiones finales, cada uno con mínimo 12 leads de
+  evidencia citados. El archivo `content_sources.json` se conserva en el
+  repo (lo pide el enunciado original) pero ya no alimenta nada.
 
 - **Sin un LLM en vivo redactando los mensajes.** Lo evalué y decidí no
   conectar una API de IA generativa (tipo Claude/OpenAI) para los borradores
