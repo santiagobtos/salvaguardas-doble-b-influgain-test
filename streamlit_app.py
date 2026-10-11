@@ -30,6 +30,35 @@ _TIPO_DEUDA_LABELS = {
 }
 
 
+_ACTOR_LABELS = {"sistema": "Sistema", "humano": "Humano", "reintento_manual": "Reintento manual"}
+_ACCION_LABELS = {"transferencia_sin_telefono": "Transferencia sin teléfono"}
+
+
+def _formatear_accion(accion):
+    if accion.startswith("disposicion:"):
+        return f"Disposición: {accion.split(':', 1)[1]}"
+    return _ACCION_LABELS.get(accion, accion.replace("_", " ").capitalize())
+
+
+def _tabla_audit(entries, incluir_lead=False):
+    """Mismo audit_trail de la base, pero legible: quién fue (humano vs.
+    sistema vs. reintento automático) y el cambio de etapa en una sola
+    columna en vez de 'antes' y 'después' sueltos."""
+    filas = []
+    for a in entries:
+        fila = {
+            "Timestamp": a["timestamp"],
+            "Quién": _ACTOR_LABELS.get(a["actor"], a["actor"]),
+            "Qué pasó": _formatear_accion(a["accion"]),
+            "Cambio de etapa": f"{a['estado_anterior']} → {a['estado_nuevo']}",
+            "Detalle": a["detalle"],
+        }
+        if incluir_lead:
+            fila = {"Lead": a["lead_id"], **fila}
+        filas.append(fila)
+    return pd.DataFrame(filas)
+
+
 def _formatear_precalificacion(lead):
     """Detalles de pre-calificación en lenguaje legible para el agente
     humano, no los valores crudos que guarda la base (snake_case, enteros
@@ -496,7 +525,7 @@ def _contenido_modal_b(lead_id):
                     lead_id, lead["timestamp"], lead["creador"], lead["canal"],
                     lead["mensaje"], nuevo_tel.strip(), lead["estado"],
                 )
-                r = crm_automation.aplicar_disposicion(lead_id, "Transferido")
+                r = crm_automation.aplicar_disposicion(lead_id, "Transferido", actor="humano")
                 if r["status"] == "ok":
                     st.success(f"Teléfono guardado y transferido → {r['stage']}.")
                 elif r["status"] == "borrador_pendiente":
@@ -558,7 +587,7 @@ def _contenido_modal_b(lead_id):
         if not disposicion_sel:
             st.warning("Selecciona una disposición primero.")
         else:
-            r = crm_automation.aplicar_disposicion(lead_id, disposicion_sel, forzar_fallo_webhook=forzar_webhook_caido)
+            r = crm_automation.aplicar_disposicion(lead_id, disposicion_sel, actor="humano", forzar_fallo_webhook=forzar_webhook_caido)
             if r["status"] == "ok":
                 intentos = r.get("intentos_webhook", 1)
                 st.success(f"→ **{r['stage']}**. Borrador de WhatsApp generado" + (f" (tras {intentos} intentos)." if intentos > 1 else "."))
@@ -576,10 +605,7 @@ def _contenido_modal_b(lead_id):
     if audit_lead:
         st.markdown("---")
         st.markdown("**Historial de auditoría de este lead**")
-        st.dataframe(
-            pd.DataFrame(audit_lead)[["timestamp", "actor", "accion", "estado_anterior", "estado_nuevo"]],
-            use_container_width=True, hide_index=True,
-        )
+        st.dataframe(_tabla_audit(audit_lead), use_container_width=True, hide_index=True)
 
 
 # --------------------------------------------------------------- top bar --
@@ -787,6 +813,23 @@ def _colorear_fila_b(row):
     return estilos
 
 
+_ESTADO_FALLO_LABELS = {
+    "pending_retry": "Pendiente de reintento",
+    "resuelto": "Resuelto",
+    "fallido_permanente": "Fallido permanente",
+}
+_COLOR_ESTADO_FALLO = {
+    "Pendiente de reintento": "#fef3dc",
+    "Resuelto": "#dcfce7",
+    "Fallido permanente": "#fde2e1",
+}
+
+
+def _colorear_fila_fallos(row):
+    bg = _COLOR_ESTADO_FALLO.get(row["Estado"])
+    return [f"background-color:{bg}" if bg else "" for _ in row.index]
+
+
 # ======================================================================= #
 # EJERCICIO B — MÓDULO 1                                                   #
 # ======================================================================= #
@@ -864,13 +907,9 @@ with tab_b:
         st.caption("Todavía no se ha generado ningún borrador.")
 
     st.markdown("### Historial de auditoría")
-    audit = db.listar_audit_trail()
+    audit = sorted(db.listar_audit_trail(), key=lambda a: a["id"], reverse=True)
     if audit:
-        df_audit = pd.DataFrame(audit).sort_values("id", ascending=False)
-        st.dataframe(
-            df_audit[["timestamp", "lead_id", "actor", "accion", "estado_anterior", "estado_nuevo", "detalle"]],
-            use_container_width=True, hide_index=True,
-        )
+        st.dataframe(_tabla_audit(audit, incluir_lead=True), use_container_width=True, hide_index=True)
     else:
         st.caption("Sin movimientos todavía.")
 
@@ -894,17 +933,27 @@ with tab_b:
         st.rerun()
 
     st.markdown("#### Cola de fallos (dead-letter queue)")
-    fallos = db.listar_fallos_pendientes()
+    st.caption("Un fallo resuelto o fallido_permanente no se borra de esta lista — queda como constancia de que pasó, nunca desaparece en silencio.")
     if st.button("Reintentar manualmente"):
         resultados = crm_automation.reintentar_fallos()
         resueltos = [r for r in resultados if r["status"] == "resuelto"]
         if resueltos:
             st.success(f"{len(resueltos)} fallo(s) resueltos al reintentar: {', '.join(r['lead_id'] for r in resueltos)}.")
         st.rerun()
+
+    fallos = db.listar_fallos()
     if fallos:
-        st.dataframe(pd.DataFrame(fallos)[["tipo", "error", "retry_count", "status"]], use_container_width=True, hide_index=True)
+        df_fallos = pd.DataFrame(fallos).rename(columns={
+            "tipo": "Tipo", "error": "Error", "retry_count": "Reintentos",
+        })
+        df_fallos["Estado"] = df_fallos["status"].map(lambda s: _ESTADO_FALLO_LABELS.get(s, s))
+        df_fallos = df_fallos[["Tipo", "Error", "Reintentos", "Estado"]]
+        st.dataframe(
+            df_fallos.style.apply(_colorear_fila_fallos, axis=1),
+            use_container_width=True, hide_index=True,
+        )
     else:
-        st.caption("Sin fallos pendientes.")
+        st.caption("Sin fallos — ni pendientes, ni históricos.")
 
 # ======================================================================= #
 # EJERCICIO C — MÓDULO 2                                                   #

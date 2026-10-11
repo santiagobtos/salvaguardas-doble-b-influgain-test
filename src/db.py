@@ -241,6 +241,16 @@ def listar_fallos_pendientes():
     return [dict(r) for r in rows]
 
 
+def listar_fallos():
+    """Toda la cola de fallos, sin importar el estado — a diferencia de
+    listar_fallos_pendientes(), un fallo resuelto o fallido_permanente
+    no desaparece de aquí: queda como constancia de que pasó."""
+    conn = get_connection()
+    rows = conn.execute("SELECT * FROM failed_queue ORDER BY id DESC").fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
 def incrementar_retry(fallo_id):
     conn = get_connection()
     conn.execute(
