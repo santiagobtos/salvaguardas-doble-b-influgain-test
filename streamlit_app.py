@@ -22,6 +22,19 @@ from src.prequalification_agent import procesar_mensaje_entrante
 
 RULES_PATH = Path(__file__).resolve().parent / "rules" / "rules.yaml"
 
+# Plantilla para el Ejercicio C: mismas columnas que partner_enrollments.csv,
+# con 3 filas de ejemplo que usan lead_id reales de data/leads.csv (L002,
+# L003, L004) — así quien la llene y la suba ve de inmediato una fila
+# "Exacta" (L002, teléfono real), una "Sin Atribuir" (L003, sin creator_id)
+# y una "Atribución Probabilística" (L004, teléfono distinto pero mismo
+# creador), en vez de un CSV vacío sin pistas de qué probar.
+PLANTILLA_ENROLLMENTS_CSV = (
+    "enrollment_id,lead_id,creator_id,telefono,fecha_inscripcion,monto_pactado,status\n"
+    "E201,L002,@pedro.ahorra,3000000002,2026-10-01,2000000,Activo\n"
+    "E202,L003,,3000000003,2026-10-02,1500000,Pendiente\n"
+    "E203,L004,@carla.finanzas,3009999999,2026-10-03,2500000,Activo\n"
+)
+
 _TIPO_DEUDA_LABELS = {
     "tarjeta_credito": "Tarjeta de crédito",
     "libranza": "Libranza",
@@ -1201,16 +1214,66 @@ with tab_c:
         icon="ℹ️",
     )
 
-    uploaded = st.file_uploader(
-        "Sube el CSV de inscripciones del partner (opcional — si no subes nada, se usa el dataset incluido)",
-        type="csv",
-    )
-    if uploaded is not None:
-        enroll_raw = pd.read_csv(uploaded, dtype=str)
-        fuente_txt = f"archivo subido: {uploaded.name}"
-    else:
+    UPLOADS_DIR = reporting.DATA_DIR / "uploads"
+    UPLOADS_DIR.mkdir(exist_ok=True)
+    archivos_subidos = sorted(p.name for p in UPLOADS_DIR.glob("*.csv"))
+
+    OPCION_INCLUIDO = "📦 Dataset incluido (data/partner_enrollments.csv)"
+    OPCION_NUEVO = "⬆️ Subir un archivo nuevo…"
+    opciones = [OPCION_INCLUIDO] + [f"📄 {nombre}" for nombre in archivos_subidos] + [OPCION_NUEVO]
+
+    st.session_state.setdefault("c_fuente_actual", OPCION_INCLUIDO)
+    st.session_state.setdefault("c_upload_version", 0)
+    if st.session_state["c_fuente_actual"] not in opciones:
+        st.session_state["c_fuente_actual"] = OPCION_INCLUIDO
+
+    col_sel, col_tpl = st.columns([3, 1])
+    with col_sel:
+        eleccion = st.selectbox(
+            "Fuente de datos para limpiar y reportar",
+            opciones,
+            index=opciones.index(st.session_state["c_fuente_actual"]),
+            help="Elige el dataset incluido, uno que ya hayas subido antes, o sube uno nuevo.",
+        )
+        st.session_state["c_fuente_actual"] = eleccion
+    with col_tpl:
+        st.write("")
+        st.download_button(
+            "📋 Plantilla CSV",
+            PLANTILLA_ENROLLMENTS_CSV,
+            file_name="plantilla_inscripciones.csv",
+            mime="text/csv",
+            use_container_width=True,
+            help="Mismas columnas que espera el sistema, con 3 filas de ejemplo usando leads reales — llénala con más filas y súbela para comprobar que esto no es estático.",
+        )
+
+    if eleccion == OPCION_NUEVO:
+        nuevo = st.file_uploader(
+            "Sube tu CSV (mismas columnas que la plantilla)",
+            type="csv",
+            key=f"c_nuevo_upload_v{st.session_state['c_upload_version']}",
+        )
+        if nuevo is not None:
+            destino = UPLOADS_DIR / nuevo.name
+            destino.write_bytes(nuevo.getvalue())
+            st.session_state["c_fuente_actual"] = f"📄 {nuevo.name}"
+            st.session_state["c_upload_version"] += 1
+            st.toast(f"Guardado como data/uploads/{nuevo.name} — ya queda disponible en el selector.")
+            st.rerun()
+        enroll_raw = reporting.cargar_enrollments_crudo()
+        fuente_txt = "data/partner_enrollments.csv (incluido en el repo) — sube tu archivo arriba"
+    elif eleccion == OPCION_INCLUIDO:
         enroll_raw = reporting.cargar_enrollments_crudo()
         fuente_txt = "data/partner_enrollments.csv (incluido en el repo)"
+    else:
+        nombre_archivo = eleccion.removeprefix("📄 ")
+        ruta = UPLOADS_DIR / nombre_archivo
+        enroll_raw = pd.read_csv(ruta, dtype=str)
+        fuente_txt = f"data/uploads/{nombre_archivo} (subido antes)"
+        if st.button(f"🗑 Borrar {nombre_archivo}"):
+            ruta.unlink(missing_ok=True)
+            st.session_state["c_fuente_actual"] = OPCION_INCLUIDO
+            st.rerun()
     st.caption(f"Usando {fuente_txt} — {len(enroll_raw)} filas.")
 
     problemas = reporting.detectar_problemas(enroll_raw)
