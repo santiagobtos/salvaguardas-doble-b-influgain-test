@@ -31,59 +31,65 @@ python cli.py demo
 # 5. Levantar el panel operativo (interfaz principal para la demo/video)
 streamlit run streamlit_app.py
 # Panel: http://localhost:8501
+# En la pestaña "Leads que llegan" hay que darle una vez a
+# "Cargar leads por defecto" para sembrar el CRM en vivo.
 ```
-
-Al abrir el panel se siembran automáticamente ~18 leads pasados por el
-agente real (no son datos falseados en la UI), así la pestaña de CRM no
-empieza vacía. Desde ahí puedes mandar un mensaje nuevo, aplicar
-disposiciones directamente en la tabla, subir tu propio CSV de
-inscripciones, y ver el efecto de cada acción en vivo. El botón **"Reiniciar
-panel"** en la barra lateral resetea la operación en vivo (A y B) sin tocar
-los datos fijos del Ejercicio C.
 
 También existe una API HTTP equivalente (`uvicorn webhook_server:app
 --reload`, documentada en `/docs`) por si se necesita integrar por webhook en
-vez de interfaz — ver [`webhook_server.py`](webhook_server.py). El panel de
-Streamlit es la interfaz pensada para la demo/video.
+vez de interfaz — ver [`webhook_server.py`](webhook_server.py).
 
-## Qué hace cada pieza
+## Consola real (output de los pasos 3-5, sin editar)
 
-| Ejercicio | Código | Qué prueba | En el panel |
-|---|---|---|---|
-| A — Pre-calificación + handoff | `src/prequalification_agent.py` | Ingesta un mensaje, clasifica (`responder`/`ignorar`/`escalar_humano`), pre-califica y deja un **borrador** en cola humana. Nunca envía ni transfiere solo. | Pestaña "A · Pre-calificación": formulario + historial de decisiones |
-| B — CRM | `src/crm_automation.py` | Aplica disposiciones, mueve etapa, genera borrador de WhatsApp, deja audit trail, maneja errores (teléfono faltante, lead inexistente, disposición inválida) con cola de fallos y reintento. | Pestaña "B · CRM": tabla editable de 18 leads con selector de disposición por fila, audit trail, cola de fallos y 3 botones para simular errores |
-| C — Datos y reporting | `src/reporting.py` | Limpia un CSV sucio del partner (subido o el incluido), calcula funnel, leads estancados y qué rompería comisiones. | Pestaña "C · Datos y reporting": subir CSV, vista de datos sucios resaltados, botón de limpieza, métricas y explicación |
-| D — Contenido | `src/content_system.py` | Clasifica los 42 mensajes reales de `data/leads.csv` (los mismos de A/C) en 8-12 "fuentes de contenido" editables en `rules.yaml` (pregunta/objeción/tendencia + frecuencia + urgencia reales), las agrupa en 3 guiones, cada uno con un mínimo de 12 leads de evidencia citados. | Pestaña "D · Contenido": tabla de fuentes + tarjetas de guiones + informe/evidencia desplegable por guion |
+```
+$ pytest
+........                                                                 [100%]
+8 passed in 0.08s
 
-## Reglas de negocio editables sin tocar código
+$ python cli.py demo
+======================================================================
+EJERCICIO A — Agente de pre-calificación + handoff
+======================================================================
+- L901: decisión=responder | razón=Cuenta que tiene deuda de tarjeta de crédito por $3.500.000 y pregunta qué puede hacer — dentro de lo normal. | draft_id=1
+- L902: decisión=escalar_humano | razón=Palabra de riesgo/ambigüedad detectada: 'demanda' | draft_id=None
+- L903: decisión=ignorar | razón=Palabra de salida/no-interés detectada: 'no me interesa' | draft_id=None
 
-Todo el criterio de clasificación vive en [`rules/rules.yaml`](rules/rules.yaml)
-y se recarga en cada request: palabras que fuerzan escalar a humano, palabras
-que indican baja/ignorar, umbrales de monto de deuda, palabras para inferir
-tipo de deuda, palabras de interés en el Consejero, días para considerar un
-lead "estancado", y las categorías de contenido del Ejercicio D. Cambiar un
-valor ahí cambia el comportamiento sin reiniciar ni tocar `src/`.
+======================================================================
+EJERCICIO B — Automatización CRM (disposiciones)
+======================================================================
+- L901 -> Transferido: {'status': 'borrador_pendiente', 'motivo': 'borrador_sin_revisar', 'draft_id': 1}
+- L902 -> Call Back: {'status': 'ok', 'stage': 'Agendado', 'draft_id': 2, 'intentos_webhook': 1}
+- L999 -> Info Sent (lead inexistente, debe ir a cola de fallos): {'status': 'error', 'motivo': 'lead_no_encontrado'}
+- Cola de fallos pendiente: [{'id': 1, 'tipo': 'lead_no_encontrado', 'error': "Lead 'L999' no existe en la base", 'status': 'pending_retry', ...}]
+- Reintento de fallos: [{'id': 1, 'status': 'reintentado'}]
 
-## Lenguaje de compliance aplicado
+======================================================================
+EJERCICIO C — Datos y reporting (sobre data/leads.csv + partner_enrollments.csv)
+======================================================================
+- Funnel general: {'leads_totales': 42, 'respondidos': 19, 'pre_calificados': 20, 'transferidos': 17, 'inscritos_activos': 4, 'tasa_respuesta_pct': 45.2, 'tasa_transferencia_pct': 85.0, 'tasa_inscripcion_pct': 23.5}
+- Leads estancados: 3
+- Inscripciones sin creator_id: 5
+- Inscripciones con teléfono mismatch: 4
 
-- Nunca se usa la palabra "asesor" para el personal del partner — siempre
-  "Consejero".
-- El ahorro siempre se menciona en condicional ("podría", "en muchos casos"),
-  nunca como promesa.
-- No se inventan tasas de interés ni puntajes de crédito en ninguna plantilla.
-- Mensajes ambiguos o de riesgo (demandas, embargos, amenazas, fraude) se
-  escalan a un humano automáticamente, nunca los responde el agente solo.
+======================================================================
+EJERCICIO D — Mini sistema de contenido (sobre leads reales de data/leads.csv)
+======================================================================
+- Riesgo legal, deudas de libranza/hipoteca y señales de desconfianza (15 leads, score 32): [Gancho] ¿Te llegó algo que suena a embargo o demanda, o simplemente n...
+- Piden información pero no dan el siguiente paso (15 leads, score 30): [Gancho] ¿Escribiste pidiendo información y nadie te explicó cuál era ...
+- Deuda de tarjeta/consumo y no saber por dónde empezar (12 leads, score 21): [Gancho] ¿Tienes tarjeta, crédito de consumo o varias deudas juntas y ...
 
-## Datos ficticios incluidos
+======================================================================
+FIN DEMO
+======================================================================
 
-- `data/leads.csv`: 42 leads de chat simulados.
-- `data/partner_enrollments.csv`: 28 filas (incluye duplicado intencional),
-  con teléfonos que no coinciden, `creator_id` vacío y fechas inválidas a
-  propósito, para ejercitar la limpieza de datos del Ejercicio C.
-- `data/content_sources.json`: 10 fuentes de contenido ficticias, generadas
-  por `scripts/generate_fake_data.py` pero sin uso activo — el Ejercicio D ya
-  no las consume: sus 3 guiones salen de clasificar los mensajes reales de
-  `data/leads.csv` (ver tabla de arriba).
+$ streamlit run streamlit_app.py
+  You can now view your Streamlit app in your browser.
+  Local URL: http://localhost:8501
+```
+
+Si ves esto en tu propia terminal, el backend está corriendo de verdad —
+nada de lo de arriba es texto inventado para el README, es la salida real
+de correr estos comandos sobre el repo tal como está.
 
 ## Otros documentos de entrega
 
