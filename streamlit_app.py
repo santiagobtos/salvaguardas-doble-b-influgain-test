@@ -6,6 +6,7 @@ content_system). Esta es solo la capa de interfaz.
 
 Correr: streamlit run streamlit_app.py
 """
+import json
 import random
 import time
 from datetime import datetime, timezone
@@ -943,15 +944,51 @@ with tab_b:
 
     fallos = db.listar_fallos()
     if fallos:
-        df_fallos = pd.DataFrame(fallos).rename(columns={
-            "tipo": "Tipo", "error": "Error", "retry_count": "Reintentos",
-        })
-        df_fallos["Estado"] = df_fallos["status"].map(lambda s: _ESTADO_FALLO_LABELS.get(s, s))
-        df_fallos = df_fallos[["Tipo", "Error", "Reintentos", "Estado"]]
+        filas_fallos = []
+        for f in fallos:
+            payload = json.loads(f["payload_json"]) if f["payload_json"] else {}
+            filas_fallos.append({
+                "Lead": payload.get("lead_id", "—"),
+                "Tipo": f["tipo"],
+                "Error": f["error"],
+                "Reintentos": f["retry_count"],
+                "Estado": _ESTADO_FALLO_LABELS.get(f["status"], f["status"]),
+            })
         st.dataframe(
-            df_fallos.style.apply(_colorear_fila_fallos, axis=1),
+            pd.DataFrame(filas_fallos).style.apply(_colorear_fila_fallos, axis=1),
             use_container_width=True, hide_index=True,
         )
+
+        # ---- Una disposición inválida nunca se arregla sola reintentando
+        # el mismo valor — hace falta que un humano la corrija aquí ----
+        invalidas_pendientes = [f for f in fallos if f["tipo"] == "disposicion_invalida" and f["status"] == "pending_retry"]
+        if invalidas_pendientes:
+            st.markdown("###### Corregir disposición inválida")
+            for f in invalidas_pendientes:
+                payload = json.loads(f["payload_json"]) if f["payload_json"] else {}
+                lead_id_fallo = payload.get("lead_id")
+                with st.form(f"form_fix_disp_{f['id']}"):
+                    st.caption(f"Lead {lead_id_fallo}: \"{payload.get('disposicion')}\" no es una disposición válida — elige la correcta.")
+                    ncol1, ncol2 = st.columns([3, 2])
+                    nueva_disp = ncol1.selectbox(
+                        "Disposición correcta", ["", *crm_automation.STAGE_MAP.keys()],
+                        key=f"fix_disp_{f['id']}", label_visibility="collapsed",
+                    )
+                    corregir = ncol2.form_submit_button("Corregir y aplicar", type="primary", use_container_width=True)
+                if corregir:
+                    if not nueva_disp:
+                        st.warning("Selecciona una disposición válida.")
+                    elif not lead_id_fallo:
+                        st.error("Este fallo no tiene un lead asociado para corregir.")
+                    else:
+                        r = crm_automation.corregir_disposicion_invalida(f["id"], lead_id_fallo, nueva_disp)
+                        if r["status"] == "ok":
+                            st.success(f"Corregido → {r['stage']}.")
+                        elif r["status"] == "borrador_pendiente":
+                            st.warning("Hay un borrador sin revisar para ese lead — apruébalo o descártalo primero.")
+                        else:
+                            st.info(f"Resultado: {r}")
+                        st.rerun()
     else:
         st.caption("Sin fallos — ni pendientes, ni históricos.")
 

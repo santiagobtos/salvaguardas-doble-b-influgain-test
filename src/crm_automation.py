@@ -204,6 +204,18 @@ def aplicar_disposicion(lead_id, disposicion, actor="sistema", forzar_fallo_webh
     return {"status": "ok", "stage": nuevo_stage, "draft_id": draft_id, "intentos_webhook": intentos}
 
 
+def corregir_disposicion_invalida(fallo_id, lead_id, nueva_disposicion, actor="humano"):
+    """Para un fallo de tipo 'disposicion_invalida': reintentar a ciegas no
+    sirve de nada porque el valor inválido original sigue siendo inválido
+    para siempre — hace falta que un humano lo corrija aquí. Si la
+    disposición corregida sí se puede aplicar, el fallo se marca resuelto
+    en vez de seguir sumando reintentos inútiles."""
+    r = aplicar_disposicion(lead_id, nueva_disposicion, actor=actor)
+    if r["status"] in ("ok", "pendiente_dato", "escalado"):
+        db.marcar_fallo_estado(fallo_id, "resuelto")
+    return r
+
+
 def reintentar_fallos(max_retries=3):
     """Reintento manual desde la cola de fallos (botón 'Reintentar
     manualmente'). Para 'webhook_caido' vuelve a intentar la disposición
