@@ -143,9 +143,17 @@ def generar_enrollments(leads, n=27):
             telefono = "30011XX22"
         elif i == 2:
             telefono = "30112"
-        # Filas 3-4: teléfono con formato válido pero que no coincide con el lead
-        # (mismatch, un error distinto: captura de otro número real).
-        elif i <= 4:
+        # Fila 3: teléfono distinto Y creador distinto — sin ninguna señal
+        # que corrobore que es el mismo lead ("Sin Coincidencia").
+        # Fila 4: teléfono distinto PERO el mismo creador que originó al
+        # lead — corrobora que probablemente es la misma persona con un
+        # typo del partner, no una atribución robada ("Atribución
+        # Probabilística"). Las dos filas prueban los dos caminos del
+        # fuzzy matching con datos reales del dataset, no solo en teoría.
+        elif i == 4:
+            telefono = _telefono_falso(999 - i)
+            creator_id = lead["creador"]
+        elif i == 3:
             telefono = _telefono_falso(999 - i)
 
         fecha = _fecha_aleatoria(dias_atras_max=10).strftime("%Y-%m-%d")

@@ -52,6 +52,13 @@ consejero_interes_keywords:
   - "informacion"
   - "información"
 
-# Un lead sin cambio de disposición en más de este número de días se
-# considera "estancado" en el reporting (Ejercicio C).
-leads_estancados_dias: 3
+# Un lead pre-calificado (Respondido/Escalado) sin avanzar a una
+# inscripción en más de este número de días se considera "estancado" en
+# el reporting (Ejercicio C). 2 días ≈ 48 horas.
+leads_estancados_dias: 2
+
+# Tasa de comisión usada SOLO para el reporte interno de ROI por
+# creador/canal del Ejercicio C (Performance por Creador/Canal) — una
+# aproximación para priorizar internamente, nunca un número que se le
+# promete al lead ni al creador.
+comision_pct_estimada: 20

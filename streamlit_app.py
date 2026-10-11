@@ -896,6 +896,14 @@ def _colorear_fila_fallos(row):
     return [f"background-color:{bg}" if bg else "" for _ in row.index]
 
 
+_COLOR_COMISION = {"Pagable": "#dcfce7", "En Disputa": "#fef3dc", "Bloqueada": "#fde2e1"}
+
+
+def _colorear_fila_comision(row):
+    bg = _COLOR_COMISION.get(row.get("Estado comisión"))
+    return [f"background-color:{bg}" if bg else "" for _ in row.index]
+
+
 # Simula el tipo de valor "casi correcto" que de verdad llegaría de una
 # integración externa con un bug (mayúscula distinta, sinónimo, formato
 # equivocado) — no un string obviamente inventado como "Disposición
@@ -1227,7 +1235,8 @@ with tab_c:
         for n in notas:
             st.markdown(f"- {n}")
 
-        funnel = reporting.calcular_funnel(leads_c, enroll_limpio)["general"]
+        funnel_completo = reporting.calcular_funnel(leads_c, enroll_limpio)
+        funnel = funnel_completo["general"]
         st.markdown("#### Funnel: de lead a inscripción activa")
 
         total = funnel["leads_totales"] or 1
@@ -1253,10 +1262,37 @@ with tab_c:
 
         estancados = reporting.leads_estancados(leads_c, enroll_limpio)
         st.markdown(f"#### Leads estancados ({len(estancados)})")
+        st.caption("Ya pre-calificados (Respondido/Escalado) y sin inscripción, ordenados por el monto de deuda que mencionaron — primero donde hay más plata en juego.")
         if estancados:
-            st.dataframe(pd.DataFrame(estancados), use_container_width=True, hide_index=True)
+            df_estancados = pd.DataFrame(estancados).rename(columns={
+                "lead_id": "Lead", "creador": "Creador", "canal": "Canal",
+                "estado_inicial": "Estado", "timestamp": "Llegó", "monto_estimado": "Monto estimado",
+            })
+            st.dataframe(df_estancados, use_container_width=True, hide_index=True)
         else:
             st.caption("Ninguno en este momento.")
+
+        st.markdown("#### Performance por creador y por canal")
+        st.caption(f"Comisión estimada con una tasa interna configurable ({funnel_completo['comision_pct_estimada']}% en rules.yaml) — solo para priorizar, nunca un número que se le promete a nadie.")
+        pc1, pc2 = st.columns(2)
+        with pc1:
+            st.markdown("**Por creador**")
+            st.dataframe(
+                pd.DataFrame(funnel_completo["por_creador"]).rename(columns={
+                    "creador": "Creador", "leads_totales": "Leads", "inscritos_confirmados": "Inscritos",
+                    "conversion_pct": "Conversión %", "comision_estimada": "Comisión estimada",
+                }),
+                use_container_width=True, hide_index=True,
+            )
+        with pc2:
+            st.markdown("**Por canal**")
+            st.dataframe(
+                pd.DataFrame(funnel_completo["por_canal"]).rename(columns={
+                    "canal": "Canal", "leads_totales": "Leads", "inscritos_confirmados": "Inscritos",
+                    "conversion_pct": "Conversión %", "comision_estimada": "Comisión estimada",
+                }),
+                use_container_width=True, hide_index=True,
+            )
 
         comisiones = reporting.reporte_ruptura_comisiones(leads_c, enroll_limpio)
         st.markdown("#### Qué rompería el pago de comisiones")
@@ -1271,8 +1307,8 @@ with tab_c:
             "sin_atribuir" genérico, o al creador equivocado por un teléfono mal capturado) o de menos
             (negando una comisión legítima porque el sistema no logra cruzar el lead con su inscripción).
             Por eso esta limpieza no es un paso cosmético: es la diferencia entre un reporte financiero
-            confiable y uno que esconde errores de atribución. Análisis completo en
-            <code>RUPTURA_COMISIONES.md</code> (en la raíz del repo).
+            confiable y uno que esconde errores de atribución. Análisis completo para Dirección
+            Financiera en <code>RUPTURA_COMISIONES.md</code> (en la raíz del repo).
             </div>""",
             unsafe_allow_html=True,
         )
@@ -1282,9 +1318,44 @@ with tab_c:
                 pd.DataFrame(comisiones["ejemplos_mismatch"]).rename(columns={
                     "enrollment_id": "Inscripción", "lead_id": "Lead",
                     "telefono_lead": "Teléfono del lead", "telefono_normalizado": "Teléfono en la inscripción",
+                    "match_type": "Tipo de coincidencia",
                 }),
                 use_container_width=True, hide_index=True,
             )
+
+        st.markdown("#### Reconciliación de inscripciones")
+        st.caption(
+            "Cada inscripción, con su tipo de coincidencia y si se puede pagar tal cual — \"Exacta\" "
+            "coincide por teléfono; \"Atribución Probabilística\" el teléfono no coincide pero el "
+            "creador sí, hay indicio de que es la misma persona; \"Sin Coincidencia\" no hay ninguna "
+            "señal; \"Sin Atribuir\" no trae creador."
+        )
+        reconciliado = reporting.reconciliar_conversiones(leads_c, enroll_limpio)
+        df_reconciliado = reconciliado.rename(columns={
+            "enrollment_id": "Inscripción", "lead_id": "Lead", "creator_id": "Creador",
+            "telefono": "Teléfono", "fecha_inscripcion": "Fecha", "monto_pactado": "Monto",
+            "status": "Status", "is_clean": "Limpia", "match_type": "Tipo de coincidencia",
+            "commission_status": "Estado comisión",
+        })
+        st.dataframe(
+            df_reconciliado.style.apply(_colorear_fila_comision, axis=1),
+            use_container_width=True, hide_index=True,
+        )
+
+        cola_disputas = df_reconciliado[df_reconciliado["Estado comisión"] != "Pagable"]
+        st.markdown(f"#### Cola de disputas — validación humana antes de pagar ({len(cola_disputas)})")
+        st.caption(
+            "Protocolo operativo: nada de esta lista se paga automático. Alguien de Finanzas u "
+            "Operaciones confirma con el partner (o con el creador) antes de mover cualquiera de "
+            "estas filas a \"Pagable\" — ver el protocolo completo en RUPTURA_COMISIONES.md."
+        )
+        if len(cola_disputas):
+            st.dataframe(
+                cola_disputas.style.apply(_colorear_fila_comision, axis=1),
+                use_container_width=True, hide_index=True,
+            )
+        else:
+            st.caption("Sin disputas pendientes — todo lo reconciliado es pagable tal cual.")
 
 # ======================================================================= #
 # EJERCICIO D                                                              #

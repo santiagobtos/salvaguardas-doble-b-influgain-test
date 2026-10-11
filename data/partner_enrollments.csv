@@ -2,7 +2,7 @@ enrollment_id,lead_id,creator_id,telefono,fecha_inscripcion,monto_pactado,status
 E001,L021,@pedro.ahorra,30011XX22,2026-10-09,1200000,Cancelado
 E002,L036,@juanfi_libre,30112,2026-10-06,1200000,Cancelado
 E003,L009,@laura_consejos,3000000996,2026-10-07,0,Cancelado
-E004,L025,@laura_consejos,3000000995,2026-10-07,0,Pendiente
+E004,L025,@manu.deudas,3000000995,2026-10-07,0,Pendiente
 E005,L042,@juanfi_libre,3000000042,31/02/2026,500000,Cancelado
 E006,L042,@laura_consejos,3000000042,,3000000,Cancelado
 E007,L009,@carla.finanzas,3000000009,2026-13-45,500000,Cancelado

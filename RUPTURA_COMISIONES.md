@@ -1,39 +1,83 @@
-# Qué rompería el pago de comisiones
+# Qué rompería el pago de comisiones — para Dirección Financiera
 
-Datos: `data/partner_enrollments.csv`, 28 inscripciones del partner. Dos problemas del dataset, por sí solos, pueden cambiar cuánto le pagamos a cada creador — no son defectos cosméticos del CSV, son plata mal calculada.
+Para: Dirección Financiera. De: Operaciones/Tecnología.
+Base: `data/partner_enrollments.csv` (28 inscripciones del partner) reconciliadas
+contra `data/leads.csv` (42 leads de chat) — ver la pestaña **C · Datos y
+reporting** del panel, sección "Reconciliación de inscripciones", para los
+mismos números en vivo sobre cualquier CSV que suban.
 
-## 1. `creator_id` vacío — 5 de 28 inscripciones (17.9%)
+De 28 inscripciones, **1 es un duplicado** (mismo `enrollment_id` repetido, se
+descarta quedándose con la fecha de conversión más antigua y válida) y de las
+27 restantes, **12 no se pueden pagar tal cual llegaron** — 5 sin creador
+asignado y 7 con problema de teléfono (3 con formato inválido, 4 que no
+coinciden con el lead original, de las cuales 1 sí tiene un indicio que la
+salva). Esto no es un detalle de limpieza de CSV: es plata mal atribuida si
+se paga sin filtrar.
 
-Cuando el export del partner no trae quién originó el lead, no hay forma de saber a qué creador pagarle esa comisión. En la demo estas filas se marcan como `sin_atribuir` en vez de borrarlas — conservamos el dato (la inscripción sí existe, el dinero sí se debe a alguien), pero quedan visibles y separadas del resto para que alguien las revise.
+## a) Impacto financiero
 
-Lo que **no** debe pasar en producción:
+**`creator_id` nulo — 5 de 27 inscripciones (18.5%).** Cuando el export del
+partner no trae quién originó el lead, no hay a quién pagarle. Pagar "por
+defecto" al último creador que tocó el lead en el CRM le da crédito (y plata)
+a quien no lo generó; no pagar nada es dejar de pagarle a un creador que sí
+cumplió. Hoy estas filas se marcan `sin_atribuir` y quedan **bloqueadas** —
+ni se pagan ni se descartan — hasta reconciliarlas a mano.
 
-- Pagarle a un creador "por defecto" o al último que tocó el lead en el CRM — eso le da el crédito (y la plata) a quien no generó el lead.
-- Ignorar la fila y no pagarle a nadie — si de verdad vino de un creador nuestro, esa es plata que la agencia le debe y le está dejando de pagar.
+**Teléfono que no coincide — 4 de 27 inscripciones (14.8%), más 3 con formato
+inválido que tampoco se pueden cruzar.** Ejemplos reales del dataset:
 
-La única salida correcta es **bloquear esa comisión específica** hasta que alguien la reconcilie a mano contra el CRM del partner (por `enrollment_id` + fecha + monto). Por eso el dato se conserva marcado, nunca se descarta ni se adivina.
+| Inscripción | Lead | Teléfono del lead | Teléfono en la inscripción | Diagnóstico | Estado |
+|---|---|---|---|---|---|
+| E001 | L021 | +573000000021 | *(formato inválido: `30011XX22`)* | No se puede verificar | Bloqueada |
+| E002 | L036 | +573000000036 | *(formato inválido: `30112`, incompleto)* | No se puede verificar | Bloqueada |
+| E003 | L009 | +573000000009 | +573000000996 | Sin ninguna señal que corrobore que es el mismo lead | Bloqueada |
+| E004 | L025 | +573000000025 | +573000000995 | Teléfono distinto, **pero el `creator_id` sí es `@manu.deudas`**, el mismo creador que originó a L025 | En Disputa (no Bloqueada) |
 
-## 2. Teléfono que no coincide — 4 de 28 inscripciones (14.3%)
+El caso E004 es la clave del riesgo financiero: si tratáramos todo mismatch
+de teléfono igual, perderíamos la señal de que E004 probablemente **sí** es
+el lead correcto con un typo del partner, y le negaríamos una comisión
+legítima a `@manu.deudas`. Si tratáramos todo mismatch como pagable sin
+revisar, pagaríamos E001/E002/E003 sin ninguna evidencia de que son nuestros
+leads — margen perdido a favor del partner o de un creador equivocado.
 
-El teléfono que capturó el partner en la inscripción no es el mismo que el lead dio cuando escribió por primera vez. Ejemplos reales del dataset (`src/reporting.py::reporte_ruptura_comisiones`):
+**Resumen de exposición:** de 27 inscripciones limpias, el sistema de hoy
+clasifica 15 como **Pagables de inmediato**, 1 **En Disputa** (señal parcial,
+revisar antes de pagar) y 11 **Bloqueadas** (sin ninguna señal, no pagar sin
+reconciliar a mano con el partner). Pagar las 12 sin filtrar es el escenario
+de mayor riesgo: fuga de comisión hacia leads que no son nuestros. No pagar
+ninguna de las 12 hasta resolverlas a mano es el escenario conservador —
+cuesta tiempo de revisión, pero no cuesta margen.
 
-| enrollment_id | lead_id | teléfono del lead | teléfono en la inscripción |
-|---|---|---|---|
-| E001 | L021 | 3000000021 | 3001122 |
-| E002 | L036 | 3000000036 | 30112 |
-| E003 | L009 | 3000000009 | 3000000996 |
-| E004 | L025 | 3000000025 | 3000000995 |
+## b) Protocolo técnico/operativo de solución
 
-Sin ese cruce, no se puede confirmar que la inscripción corresponde al **mismo** lead que originó un creador nuestro. Tres explicaciones posibles, cada una con una consecuencia financiera distinta:
+Lo que el sistema ya hace hoy:
 
-1. **Error de digitación del partner** al capturar el dato (lo más probable para los casos truncados como "30112" o "3001122") — el lead sí es nuestro, solo está mal escrito.
-2. **El partner cruzó mal** la inscripción con un lead que no es el nuestro (alguien que llegó por otro canal, coincidencia de nombre).
-3. **Caso límite:** alguien se atribuye una comisión de un lead que no generó.
+- **Cola de Disputas en el CRM** (pestaña C del panel, "Cola de disputas —
+  validación humana antes de pagar"): las 12 filas bloqueadas o en disputa
+  quedan visibles, con su `match_type` y motivo, para que Finanzas u
+  Operaciones las revise una por una antes de aprobar el pago. Ninguna se
+  paga automático.
 
-Pagar la comisión sin distinguir cuál de los tres pasó significa que la agencia puede estar pagando por leads que no fueron suyos (caso 3), o negándole el pago a un creador legítimo por un typo del partner (caso 1). Los dos son errores financieros reales, no detalles técnicos de limpieza de datos.
+Lo que falta por implementar — recomendación, no construido aún porque los
+datos de origen no existen en los CSV de esta prueba:
 
-## Qué hace el sistema hoy — y qué no hace a propósito
+- **Fallback por `utm_source`:** cuando el teléfono no coincide y el creador
+  tampoco corrobora (caso "Sin Coincidencia"), cruzar por el `utm_source` de
+  la campaña del creador antes de bloquear del todo — hoy el dataset no trae
+  ese campo, así que esta regla queda documentada para cuando el export del
+  partner lo incluya.
+- **Código de cupón por consejero:** pedirle a Consejería Clara que capture
+  un código de cupón único por creador en la inscripción (no solo el
+  teléfono) daría una segunda señal de atribución independiente del dato de
+  contacto, que es justo el que más se corrompe en captura manual.
+- **Cola de Disputas** como paso obligatorio antes de cualquier pago — esta
+  parte sí está construida (ver arriba); lo que falta es decidir el SLA de
+  revisión (ej. 48h) y quién la resuelve.
 
-`reporte_ruptura_comisiones()` detecta y cuenta ambos casos sobre **cualquier** CSV que se suba en la pestaña C (no solo el dataset de ejemplo), y la interfaz los muestra con ejemplos concretos (`enrollment_id`, teléfono del lead vs. teléfono de la inscripción) para que alguien los revise antes de que se calcule cualquier pago.
+## c) Recordatorio de compliance
 
-El sistema no intenta "adivinar" ni auto-resolver ninguno de los dos casos — normalizar un teléfono truncado a la fuerza, o asumir que el creador más probable es el correcto, sería inventar un dato financiero sin evidencia. Esa decisión le corresponde a alguien con el contexto del partner (puede llamar y confirmar), no a un reporte automático.
+Ninguna corrección de estos datos debe usarse para prometerle al lead un
+ahorro fijo o una tasa — eso no cambia por una reconciliación de comisiones,
+sigue prohibido en cualquier mensaje saliente. Y al personal del partner
+siempre se le llama **"Consejero"**, nunca "asesor" ni ningún otro término,
+en cualquier documento, reporte o comunicación que salga de este análisis.

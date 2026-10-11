@@ -1,43 +1,43 @@
 lead_id,timestamp,creador,canal,mensaje,telefono,estado_inicial
-L001,2026-09-30T12:58:12.617055+00:00,@carla.finanzas,CTWA,"Un abogado me contacto por el embargo de mi cuenta, estoy muy preocupado",3000000001,Nuevo
-L002,2026-10-08T08:58:12.617080+00:00,@pedro.ahorra,CTWA,"Hola, tengo una deuda de tarjeta de credito de 3500000 y no se que hacer",3000000002,Nuevo
-L003,2026-10-02T07:58:12.617088+00:00,@pedro.ahorra,CTWA,"Hola, quiero asesoria para mi libranza de nomina de 9000000",3000000003,Nuevo
-L004,2026-10-08T05:58:12.617094+00:00,@carla.finanzas,CTWA,"Esto es urgente, me amenazan con quitarme la casa",3000000004,Nuevo
-L005,2026-10-02T07:58:12.617260+00:00,@carla.finanzas,CTWA,"Buenas tardes, tengo varias deudas y no sé por dónde empezar, suman 15000000",3000000005,Respondido
-L006,2026-10-06T19:58:12.617269+00:00,@carla.finanzas,organico,"Hola, quiero asesoria para mi libranza de nomina de 9000000",3000000006,Nuevo
-L007,2026-10-08T06:58:12.617274+00:00,@pedro.ahorra,organico,"Buenas, debo libranza por 12000000, quiero informacion del programa",3000000007,Nuevo
-L008,2026-10-01T04:58:12.617280+00:00,@carla.finanzas,CTWA,"Dame de baja, no vuelvan a escribirme",3000000008,Nuevo
-L009,2026-09-30T19:58:12.617296+00:00,@juanfi_libre,organico,"Hola vi el video, debo como 2200000 en tarjeta, quiero hablar con un consejero",3000000009,Respondido
-L010,2026-10-05T07:58:12.617301+00:00,@carla.finanzas,CTWA,"Me interesa el programa, tengo una deuda hipotecaria de 45000000",3000000010,Nuevo
-L011,2026-10-11T05:58:12.617307+00:00,@pedro.ahorra,CTWA,"Me llego una demanda por mi tarjeta de credito, que hago",3000000011,Nuevo
-L012,2026-10-04T03:58:12.617312+00:00,@laura_consejos,organico,"Buenas tardes, tengo varias deudas y no sé por dónde empezar, suman 15000000",3000000012,Nuevo
-L013,2026-10-03T07:58:12.617325+00:00,@laura_consejos,CTWA,"Me interesa el programa, tengo una deuda hipotecaria de 45000000",3000000013,Respondido
-L014,2026-10-08T23:58:12.617336+00:00,@pedro.ahorra,organico,"Buenas, como funciona la consejeria de ustedes",3000000014,Respondido
-L015,2026-10-08T18:58:12.617341+00:00,@laura_consejos,CTWA,"No me interesa, quitame de esta lista por favor",3000000015,Nuevo
-L016,2026-10-03T15:58:12.617351+00:00,@laura_consejos,CTWA,Me pueden dar informacion sobre el programa de consejeria,3000000016,Respondido
-L017,2026-10-05T10:58:12.617359+00:00,@carla.finanzas,organico,"Dejen de escribirme, es spam",3000000017,Nuevo
-L018,2026-10-03T10:58:12.617364+00:00,@laura_consejos,CTWA,"Hola vi el anuncio, me pueden contar mas",3000000018,Nuevo
-L019,2026-10-02T20:58:12.617376+00:00,@pedro.ahorra,CTWA,"Dejen de escribirme, es spam",3000000019,Ignorado
-L020,2026-09-28T23:58:12.617395+00:00,@juanfi_libre,CTWA,Hola quiero saber si me pueden ayudar con mi credito de consumo de 7800000,3000000020,Respondido
-L021,2026-09-29T06:58:12.617408+00:00,@carla.finanzas,organico,"Buenas, debo libranza por 12000000, quiero informacion del programa",3000000021,Respondido
-L022,2026-10-04T13:58:12.617413+00:00,@juanfi_libre,CTWA,"Buenas, debo libranza por 12000000, quiero informacion del programa",3000000022,Nuevo
-L023,2026-10-09T07:58:12.617423+00:00,@pedro.ahorra,CTWA,Me pueden dar informacion sobre el programa de consejeria,3000000023,Respondido
-L024,2026-09-30T09:58:12.617432+00:00,@pedro.ahorra,organico,"Hola vi el anuncio, me pueden contar mas",3000000024,Respondido
-L025,2026-10-03T01:58:12.617441+00:00,@manu.deudas,organico,"Hola vi el anuncio, me pueden contar mas",3000000025,Respondido
-L026,2026-10-03T08:58:12.617446+00:00,@carla.finanzas,CTWA,"Buenas tardes, tengo varias deudas y no sé por dónde empezar, suman 15000000",3000000026,Nuevo
-L027,2026-10-11T05:58:12.617452+00:00,@pedro.ahorra,CTWA,"Hola, tengo una deuda de tarjeta de credito de 3500000 y no se que hacer",3000000027,Nuevo
-L028,2026-10-08T16:58:12.617457+00:00,@carla.finanzas,CTWA,Me pueden dar informacion sobre el programa de consejeria,3000000028,Nuevo
-L029,2026-10-08T12:58:12.617467+00:00,@pedro.ahorra,organico,Me pueden dar informacion sobre el programa de consejeria,3000000029,Respondido
-L030,2026-09-30T14:58:12.617478+00:00,@carla.finanzas,organico,"Hola, quiero asesoria para mi libranza de nomina de 9000000",3000000030,Respondido
-L031,2026-10-10T08:58:12.617497+00:00,@carla.finanzas,CTWA,"Buenas tardes, tengo varias deudas y no sé por dónde empezar, suman 15000000",3000000031,Respondido
-L032,2026-10-07T01:58:12.617515+00:00,@juanfi_libre,CTWA,Hola quiero saber si me pueden ayudar con mi credito de consumo de 7800000,3000000032,Respondido
-L033,2026-10-03T15:58:12.617522+00:00,@juanfi_libre,CTWA,"Buenas, debo libranza por 12000000, quiero informacion del programa",3000000033,Nuevo
-L034,2026-10-05T14:58:12.617593+00:00,@carla.finanzas,CTWA,Me pueden dar informacion sobre el programa de consejeria,3000000034,Respondido
-L035,2026-09-29T01:58:12.617645+00:00,@juanfi_libre,organico,"Hola, quiero asesoria para mi libranza de nomina de 9000000",3000000035,Nuevo
-L036,2026-10-04T11:58:12.617696+00:00,@manu.deudas,organico,La empresa esta en quiebra y no se que hacer con mis deudas,3000000036,Escalado
-L037,2026-10-03T14:58:12.617789+00:00,@juanfi_libre,organico,"Hola, tengo una deuda de tarjeta de credito de 3500000 y no se que hacer",3000000037,Respondido
-L038,2026-10-03T10:58:12.617817+00:00,@manu.deudas,CTWA,Me pueden dar informacion sobre el programa de consejeria,3000000038,Respondido
-L039,2026-10-01T08:58:12.617826+00:00,@carla.finanzas,CTWA,"No me interesa, quitame de esta lista por favor",3000000039,Ignorado
-L040,2026-10-02T14:58:12.617832+00:00,@laura_consejos,CTWA,"Hola vi el anuncio, me pueden contar mas",3000000040,Nuevo
-L041,2026-10-07T18:58:12.617846+00:00,@pedro.ahorra,CTWA,"Buenas tardes, tengo varias deudas y no sé por dónde empezar, suman 15000000",3000000041,Respondido
-L042,2026-10-07T01:58:12.617861+00:00,@manu.deudas,CTWA,Hola quiero saber si me pueden ayudar con mi credito de consumo de 7800000,3000000042,Respondido
+L001,2026-09-30T13:06:47.077136+00:00,@carla.finanzas,CTWA,"Un abogado me contacto por el embargo de mi cuenta, estoy muy preocupado",3000000001,Nuevo
+L002,2026-10-08T09:06:47.077229+00:00,@pedro.ahorra,CTWA,"Hola, tengo una deuda de tarjeta de credito de 3500000 y no se que hacer",3000000002,Nuevo
+L003,2026-10-02T08:06:47.077266+00:00,@pedro.ahorra,CTWA,"Hola, quiero asesoria para mi libranza de nomina de 9000000",3000000003,Nuevo
+L004,2026-10-08T06:06:47.077294+00:00,@carla.finanzas,CTWA,"Esto es urgente, me amenazan con quitarme la casa",3000000004,Nuevo
+L005,2026-10-02T08:06:47.077820+00:00,@carla.finanzas,CTWA,"Buenas tardes, tengo varias deudas y no sé por dónde empezar, suman 15000000",3000000005,Respondido
+L006,2026-10-06T20:06:47.077862+00:00,@carla.finanzas,organico,"Hola, quiero asesoria para mi libranza de nomina de 9000000",3000000006,Nuevo
+L007,2026-10-08T07:06:47.077890+00:00,@pedro.ahorra,organico,"Buenas, debo libranza por 12000000, quiero informacion del programa",3000000007,Nuevo
+L008,2026-10-01T05:06:47.077927+00:00,@carla.finanzas,CTWA,"Dame de baja, no vuelvan a escribirme",3000000008,Nuevo
+L009,2026-09-30T20:06:47.078004+00:00,@juanfi_libre,organico,"Hola vi el video, debo como 2200000 en tarjeta, quiero hablar con un consejero",3000000009,Respondido
+L010,2026-10-05T08:06:47.078038+00:00,@carla.finanzas,CTWA,"Me interesa el programa, tengo una deuda hipotecaria de 45000000",3000000010,Nuevo
+L011,2026-10-11T06:06:47.078062+00:00,@pedro.ahorra,CTWA,"Me llego una demanda por mi tarjeta de credito, que hago",3000000011,Nuevo
+L012,2026-10-04T04:06:47.078085+00:00,@laura_consejos,organico,"Buenas tardes, tengo varias deudas y no sé por dónde empezar, suman 15000000",3000000012,Nuevo
+L013,2026-10-03T08:06:47.078142+00:00,@laura_consejos,CTWA,"Me interesa el programa, tengo una deuda hipotecaria de 45000000",3000000013,Respondido
+L014,2026-10-09T00:06:47.078190+00:00,@pedro.ahorra,organico,"Buenas, como funciona la consejeria de ustedes",3000000014,Respondido
+L015,2026-10-08T19:06:47.078214+00:00,@laura_consejos,CTWA,"No me interesa, quitame de esta lista por favor",3000000015,Nuevo
+L016,2026-10-03T16:06:47.078263+00:00,@laura_consejos,CTWA,Me pueden dar informacion sobre el programa de consejeria,3000000016,Respondido
+L017,2026-10-05T11:06:47.078287+00:00,@carla.finanzas,organico,"Dejen de escribirme, es spam",3000000017,Nuevo
+L018,2026-10-03T11:06:47.078310+00:00,@laura_consejos,CTWA,"Hola vi el anuncio, me pueden contar mas",3000000018,Nuevo
+L019,2026-10-02T21:06:47.078347+00:00,@pedro.ahorra,CTWA,"Dejen de escribirme, es spam",3000000019,Ignorado
+L020,2026-09-29T00:06:47.078407+00:00,@juanfi_libre,CTWA,Hola quiero saber si me pueden ayudar con mi credito de consumo de 7800000,3000000020,Respondido
+L021,2026-09-29T07:06:47.078456+00:00,@carla.finanzas,organico,"Buenas, debo libranza por 12000000, quiero informacion del programa",3000000021,Respondido
+L022,2026-10-04T14:06:47.078471+00:00,@juanfi_libre,CTWA,"Buenas, debo libranza por 12000000, quiero informacion del programa",3000000022,Nuevo
+L023,2026-10-09T08:06:47.078500+00:00,@pedro.ahorra,CTWA,Me pueden dar informacion sobre el programa de consejeria,3000000023,Respondido
+L024,2026-09-30T10:06:47.078528+00:00,@pedro.ahorra,organico,"Hola vi el anuncio, me pueden contar mas",3000000024,Respondido
+L025,2026-10-03T02:06:47.078553+00:00,@manu.deudas,organico,"Hola vi el anuncio, me pueden contar mas",3000000025,Respondido
+L026,2026-10-03T09:06:47.078569+00:00,@carla.finanzas,CTWA,"Buenas tardes, tengo varias deudas y no sé por dónde empezar, suman 15000000",3000000026,Nuevo
+L027,2026-10-11T06:06:47.078587+00:00,@pedro.ahorra,CTWA,"Hola, tengo una deuda de tarjeta de credito de 3500000 y no se que hacer",3000000027,Nuevo
+L028,2026-10-08T17:06:47.078602+00:00,@carla.finanzas,CTWA,Me pueden dar informacion sobre el programa de consejeria,3000000028,Nuevo
+L029,2026-10-08T13:06:47.078636+00:00,@pedro.ahorra,organico,Me pueden dar informacion sobre el programa de consejeria,3000000029,Respondido
+L030,2026-09-30T15:06:47.078670+00:00,@carla.finanzas,organico,"Hola, quiero asesoria para mi libranza de nomina de 9000000",3000000030,Respondido
+L031,2026-10-10T09:06:47.078730+00:00,@carla.finanzas,CTWA,"Buenas tardes, tengo varias deudas y no sé por dónde empezar, suman 15000000",3000000031,Respondido
+L032,2026-10-07T02:06:47.078782+00:00,@juanfi_libre,CTWA,Hola quiero saber si me pueden ayudar con mi credito de consumo de 7800000,3000000032,Respondido
+L033,2026-10-03T16:06:47.078806+00:00,@juanfi_libre,CTWA,"Buenas, debo libranza por 12000000, quiero informacion del programa",3000000033,Nuevo
+L034,2026-10-05T15:06:47.078853+00:00,@carla.finanzas,CTWA,Me pueden dar informacion sobre el programa de consejeria,3000000034,Respondido
+L035,2026-09-29T02:06:47.078875+00:00,@juanfi_libre,organico,"Hola, quiero asesoria para mi libranza de nomina de 9000000",3000000035,Nuevo
+L036,2026-10-04T12:06:47.078908+00:00,@manu.deudas,organico,La empresa esta en quiebra y no se que hacer con mis deudas,3000000036,Escalado
+L037,2026-10-03T15:06:47.078988+00:00,@juanfi_libre,organico,"Hola, tengo una deuda de tarjeta de credito de 3500000 y no se que hacer",3000000037,Respondido
+L038,2026-10-03T11:06:47.079031+00:00,@manu.deudas,CTWA,Me pueden dar informacion sobre el programa de consejeria,3000000038,Respondido
+L039,2026-10-01T09:06:47.079060+00:00,@carla.finanzas,CTWA,"No me interesa, quitame de esta lista por favor",3000000039,Ignorado
+L040,2026-10-02T15:06:47.079078+00:00,@laura_consejos,CTWA,"Hola vi el anuncio, me pueden contar mas",3000000040,Nuevo
+L041,2026-10-07T19:06:47.079129+00:00,@pedro.ahorra,CTWA,"Buenas tardes, tengo varias deudas y no sé por dónde empezar, suman 15000000",3000000041,Respondido
+L042,2026-10-07T02:06:47.079174+00:00,@manu.deudas,CTWA,Hola quiero saber si me pueden ayudar con mi credito de consumo de 7800000,3000000042,Respondido
