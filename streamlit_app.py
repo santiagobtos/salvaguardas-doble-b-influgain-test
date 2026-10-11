@@ -865,6 +865,53 @@ def _colorear_fila_fallos(row):
     return [f"background-color:{bg}" if bg else "" for _ in row.index]
 
 
+# Simula el tipo de valor "casi correcto" que de verdad llegaría de una
+# integración externa con un bug (mayúscula distinta, sinónimo, formato
+# equivocado) — no un string obviamente inventado como "Disposición
+# Inventada". Cada entrada ya sabe a cuál de las 5 disposiciones válidas
+# se refería, para poder sugerirla al corregir.
+_DISPOSICIONES_INVALIDAS_POOL = [
+    ("transferido", "Transferido"),
+    ("Transferir", "Transferido"),
+    ("TRANSFERIDO_PARTNER", "Transferido"),
+    ("CallBack", "Call Back"),
+    ("Devolver llamada", "Call Back"),
+    ("call_back", "Call Back"),
+    ("Info enviada", "Info Sent"),
+    ("info_sent", "Info Sent"),
+    ("no answer", "No Answer"),
+    ("No contesta", "No Answer"),
+    ("NO_ANSWER", "No Answer"),
+    ("No interesado", "No le interesa"),
+    ("Sin interes", "No le interesa"),
+    ("not_interested", "No le interesa"),
+]
+
+
+def _sugerir_disposicion(valor_invalido):
+    """Heurística para adivinar a cuál de las 5 disposiciones válidas se
+    parece más un valor inválido — así el selector de corrección no
+    arranca vacío, sino con el candidato más probable (el humano lo
+    confirma o lo cambia, nunca se aplica solo)."""
+    if not valor_invalido:
+        return ""
+    crudo = valor_invalido.strip().lower()
+    for valor_pool, sugerida in _DISPOSICIONES_INVALIDAS_POOL:
+        if valor_pool.lower() == crudo:
+            return sugerida
+    normal = crudo.replace("_", " ").replace("-", " ")
+    for disposicion in crm_automation.STAGE_MAP:
+        if disposicion.lower() == normal:
+            return disposicion
+    palabras_valor = set(normal.split())
+    mejor, mejor_score = "", 0
+    for disposicion in crm_automation.STAGE_MAP:
+        score = len(palabras_valor & set(disposicion.lower().split()))
+        if score > mejor_score:
+            mejor, mejor_score = disposicion, score
+    return mejor
+
+
 # ======================================================================= #
 # EJERCICIO B — MÓDULO 1                                                   #
 # ======================================================================= #
@@ -966,8 +1013,9 @@ with tab_b:
     if e3.button("Simular disposición inválida"):
         leads_reales = [l for l in leads if not l["lead_id"].startswith("SIM-")]
         lead_objetivo = leads_reales[0]["lead_id"] if leads_reales else (leads[0]["lead_id"] if leads else "N/A")
-        r = crm_automation.aplicar_disposicion(lead_objetivo, "Disposición Inventada")
-        st.error(f"{lead_objetivo}: {r}")
+        valor_invalido, _sugerida = random.choice(_DISPOSICIONES_INVALIDAS_POOL)
+        r = crm_automation.aplicar_disposicion(lead_objetivo, valor_invalido)
+        st.error(f"{lead_objetivo}: llegó \"{valor_invalido}\" → {r}")
         st.rerun()
 
     st.markdown("#### Cola de fallos (dead-letter queue)")
@@ -1019,6 +1067,13 @@ with tab_b:
                     st.warning(f"El lead {payload_sel.get('lead_id')} ya no existe (¿se reinició el panel?).")
                 else:
                     badge_sel = lead_sel["estado"]
+                    valor_crudo = payload_sel.get("disposicion")
+                    sugerida = _sugerir_disposicion(valor_crudo)
+                    sugerencia_html = (
+                        f'<div class="field-label">Sugerencia</div>'
+                        f'<div class="field-value">Lo más parecido entre las 5 disposiciones válidas es <strong>"{sugerida}"</strong> — confírmalo o cambia el selector de abajo.</div>'
+                        if sugerida else ""
+                    )
                     st.markdown(
                         f"""<div class="lead-card">
                         <h4>{lead_sel['lead_id']} <span class="badge {badge_sel}">{badge_sel.replace('_',' ')}</span></h4>
@@ -1027,16 +1082,19 @@ with tab_b:
                         <div class="field-value">{lead_sel['mensaje']}</div>
                         <div class="field-label">Etapa actual</div>
                         <div class="field-value">{lead_sel['stage']}</div>
-                        <div class="field-label">Qué causó el error</div>
-                        <div class="field-value">Se intentó aplicar "{payload_sel.get('disposicion')}" — {fallo_sel['error']}</div>
+                        <div class="field-label">Valor crudo que mandó el webhook</div>
+                        <div class="field-value">"{valor_crudo}" — {fallo_sel['error']}</div>
+                        {sugerencia_html}
                         </div>""",
                         unsafe_allow_html=True,
                     )
 
+                opciones_disp = ["", *crm_automation.STAGE_MAP.keys()]
+                indice_sugerido = opciones_disp.index(sugerida) if lead_sel and sugerida in opciones_disp else 0
                 with st.form(f"form_fix_disp_{fallo_sel['id']}"):
                     ncol1, ncol2 = st.columns([3, 2])
                     nueva_disp = ncol1.selectbox(
-                        "Disposición correcta", ["", *crm_automation.STAGE_MAP.keys()],
+                        "Disposición correcta", opciones_disp, index=indice_sugerido,
                         key=f"fix_disp_{fallo_sel['id']}", label_visibility="collapsed",
                     )
                     corregir = ncol2.form_submit_button("Corregir y aplicar", type="primary", use_container_width=True)
