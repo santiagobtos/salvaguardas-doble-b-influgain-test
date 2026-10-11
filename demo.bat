@@ -13,6 +13,15 @@ echo.
 
 cd /d "%~dp0"
 
+if not exist "%USERPROFILE%\.streamlit\credentials.toml" (
+    echo Preparando Streamlit para que no pida el email de bienvenida...
+    if not exist "%USERPROFILE%\.streamlit" mkdir "%USERPROFILE%\.streamlit"
+    (
+        echo [general]
+        echo email = ""
+    ) > "%USERPROFILE%\.streamlit\credentials.toml"
+)
+
 if not exist ".venv\Scripts\activate.bat" (
     echo [1/5] No encontre un entorno virtual, creando uno nuevo...
     python -m venv .venv
@@ -52,17 +61,17 @@ python cli.py demo
 
 echo.
 echo ------------------------------------------------------------
-echo Demo de consola terminada. Presiona una tecla para abrir el
-echo panel operativo en el navegador ^(Ctrl+C aqui para salir sin
-echo abrirlo^).
-pause >nul
+echo Demo de consola terminada. Abriendo el panel en el navegador
+echo en 5 segundos...
+echo ------------------------------------------------------------
+ping -n 6 127.0.0.1 >nul
 
 echo.
-echo [5/5] Abriendo el panel operativo...
+echo [5/5] Abriendo el panel operativo en el navegador...
 echo        En la pestana "Leads que llegan" dale a "Cargar leads
 echo        por defecto" para sembrar el CRM en vivo.
 echo        Para cerrar el panel: Ctrl+C en esta ventana.
 echo ------------------------------------------------------------
-streamlit run streamlit_app.py
+streamlit run streamlit_app.py --server.headless false
 
 endlocal
