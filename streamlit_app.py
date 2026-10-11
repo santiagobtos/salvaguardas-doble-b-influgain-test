@@ -586,20 +586,30 @@ def _contenido_modal_b(lead_id):
     )
     if dcol2.button("Aplicar", type="primary", key=f"aplicar_btn_{lead_id}", use_container_width=True):
         if not disposicion_sel:
-            st.warning("Selecciona una disposición primero.")
+            st.toast("Selecciona una disposición primero.", icon="⚠️")
         else:
             r = crm_automation.aplicar_disposicion(lead_id, disposicion_sel, actor="humano", forzar_fallo_webhook=forzar_webhook_caido)
+            # st.toast en vez de st.success/warning/error: el modal hace
+            # st.rerun(scope="fragment") justo después, y un aviso normal
+            # se borra antes de que se alcance a ver — el toast sí
+            # sobrevive ese rerun.
             if r["status"] == "ok":
                 intentos = r.get("intentos_webhook", 1)
-                st.success(f"→ **{r['stage']}**. Borrador de WhatsApp generado" + (f" (tras {intentos} intentos)." if intentos > 1 else "."))
+                st.toast(f"{lead_id} → **{r['stage']}**. Borrador de WhatsApp generado" + (f" (tras {intentos} intentos)." if intentos > 1 else "."), icon="✅")
             elif r["status"] == "borrador_pendiente":
-                st.warning("Debes aprobar o descartar el borrador de WhatsApp pendiente antes de aplicar una disposición.")
+                st.toast("Debes aprobar o descartar el borrador de WhatsApp pendiente antes de aplicar una disposición.", icon="⚠️")
             elif r["status"] == "pendiente_dato":
-                st.warning(f"Sin teléfono → **{r['stage']}**. Se le pidió el dato por WhatsApp.")
+                st.toast(f"Sin teléfono → **{r['stage']}**. Se le pidió el dato por WhatsApp.", icon="⚠️")
             elif r["status"] == "escalado":
-                st.warning("No se pudo aplicar — se escaló a revisión humana.")
+                st.toast("No se pudo aplicar — se escaló a revisión humana.", icon="⚠️")
+            elif r.get("motivo") == "webhook_caido":
+                st.toast(
+                    f"El webhook del CRM está caído — {lead_id} quedó en la cola de fallos "
+                    "(Manejo de errores simulado → Cola de fallos) para arreglarlo manualmente.",
+                    icon="🔌",
+                )
             else:
-                st.error(f"Error ({r.get('motivo')}) → enviado a la cola de fallos.")
+                st.toast(f"Error ({r.get('motivo')}) → {lead_id} quedó en la cola de fallos.", icon="⚠️")
             st.rerun(scope="fragment")
 
     audit_lead = [a for a in db.listar_audit_trail() if a["lead_id"] == lead_id]
