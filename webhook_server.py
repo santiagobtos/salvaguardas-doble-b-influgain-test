@@ -121,6 +121,6 @@ def reporting_commission_breaks():
 
 
 @app.get("/content/scripts")
-def content_scripts(top_n: int = 3):
-    """Ejercicio D: guiones priorizados."""
-    return generar_guiones(top_n)
+def content_scripts():
+    """Ejercicio D: guiones priorizados, con evidencia de leads reales."""
+    return generar_guiones()

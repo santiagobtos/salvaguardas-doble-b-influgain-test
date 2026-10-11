@@ -52,9 +52,9 @@ def demo():
     print("- Inscripciones sin creator_id:", ruptura["inscripciones_sin_creator_id"])
     print("- Inscripciones con teléfono mismatch:", ruptura["inscripciones_con_telefono_mismatch"])
 
-    _separador("EJERCICIO D — Mini sistema de contenido")
+    _separador("EJERCICIO D — Mini sistema de contenido (sobre leads reales de data/leads.csv)")
     for g in generar_guiones():
-        print(f"- Fuente {g['fuente_id']} (score {g['prioridad_score']}): {g['guion'][:70]}...")
+        print(f"- {g['problema']} ({g['n_leads']} leads, score {g['prioridad_score']}): {g['guion'][:70]}...")
 
     _separador("FIN DEMO")
 

@@ -62,3 +62,21 @@ leads_estancados_dias: 2
 # aproximación para priorizar internamente, nunca un número que se le
 # promete al lead ni al creador.
 comision_pct_estimada: 20
+
+# Ejercicio D: categorías de contenido. Cada mensaje real de data/leads.csv
+# se clasifica en la PRIMERA categoría de esta lista cuyas keywords
+# aparecen en el mensaje — así un lead con varias señales no se cuenta dos
+# veces. La última categoría debe quedar con keywords vacías: es el
+# "catch-all" que recoge todo lo que no matcheó antes (hoy: riesgo legal,
+# deudas de libranza/hipoteca, y quien se quiere dar de baja). Cambiar
+# estas listas cambia de qué habla el Ejercicio D sin tocar código.
+categorias_contenido:
+  - id: friccion_informacion
+    nombre: "Piden información pero no dan el siguiente paso"
+    keywords: ["informacion", "información", "consejeria", "consejería", "contar mas", "contar más", "como funciona", "cómo funciona"]
+  - id: deuda_tarjeta_consumo
+    nombre: "Deuda de tarjeta/consumo y no saber por dónde empezar"
+    keywords: ["tarjeta", "consumo", "varias deudas"]
+  - id: riesgo_y_desconfianza
+    nombre: "Riesgo legal/embargo, deudas de libranza o vivienda, y señales de abandono"
+    keywords: []

@@ -53,16 +53,16 @@ Streamlit es la interfaz pensada para la demo/video.
 | A — Pre-calificación + handoff | `src/prequalification_agent.py` | Ingesta un mensaje, clasifica (`responder`/`ignorar`/`escalar_humano`), pre-califica y deja un **borrador** en cola humana. Nunca envía ni transfiere solo. | Pestaña "A · Pre-calificación": formulario + historial de decisiones |
 | B — CRM | `src/crm_automation.py` | Aplica disposiciones, mueve etapa, genera borrador de WhatsApp, deja audit trail, maneja errores (teléfono faltante, lead inexistente, disposición inválida) con cola de fallos y reintento. | Pestaña "B · CRM": tabla editable de 18 leads con selector de disposición por fila, audit trail, cola de fallos y 3 botones para simular errores |
 | C — Datos y reporting | `src/reporting.py` | Limpia un CSV sucio del partner (subido o el incluido), calcula funnel, leads estancados y qué rompería comisiones. | Pestaña "C · Datos y reporting": subir CSV, vista de datos sucios resaltados, botón de limpieza, métricas y explicación |
-| D — Contenido | `src/content_system.py` | Genera 3 guiones priorizados a partir de `data/content_sources.json`, cada uno trazable a su fuente. | Pestaña "D · Contenido": tarjetas de guiones |
+| D — Contenido | `src/content_system.py` | Clasifica los 42 mensajes reales de `data/leads.csv` (los mismos de A/C) contra categorías editables de `rules.yaml` y genera 3 guiones, cada uno con un mínimo de 12 leads de evidencia citados, no una fuente inventada. | Pestaña "D · Contenido": tarjetas de guiones + informe/evidencia desplegable por guion |
 
 ## Reglas de negocio editables sin tocar código
 
 Todo el criterio de clasificación vive en [`rules/rules.yaml`](rules/rules.yaml)
 y se recarga en cada request: palabras que fuerzan escalar a humano, palabras
 que indican baja/ignorar, umbrales de monto de deuda, palabras para inferir
-tipo de deuda, palabras de interés en el Consejero, y días para considerar un
-lead "estancado". Cambiar un valor ahí cambia el comportamiento sin reiniciar
-ni tocar `src/`.
+tipo de deuda, palabras de interés en el Consejero, días para considerar un
+lead "estancado", y las categorías de contenido del Ejercicio D. Cambiar un
+valor ahí cambia el comportamiento sin reiniciar ni tocar `src/`.
 
 ## Lenguaje de compliance aplicado
 
@@ -80,7 +80,10 @@ ni tocar `src/`.
 - `data/partner_enrollments.csv`: 28 filas (incluye duplicado intencional),
   con teléfonos que no coinciden, `creator_id` vacío y fechas inválidas a
   propósito, para ejercitar la limpieza de datos del Ejercicio C.
-- `data/content_sources.json`: 10 fuentes de contenido ficticias.
+- `data/content_sources.json`: 10 fuentes de contenido ficticias, generadas
+  por `scripts/generate_fake_data.py` pero sin uso activo — el Ejercicio D ya
+  no las consume: sus 3 guiones salen de clasificar los mensajes reales de
+  `data/leads.csv` (ver tabla de arriba).
 
 ## Otros documentos de entrega
 

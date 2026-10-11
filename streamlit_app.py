@@ -17,7 +17,7 @@ import streamlit as st
 import yaml
 
 from src import crm_automation, db, reporting
-from src.content_system import _cargar_fuentes, generar_guiones
+from src.content_system import MINIMO_EVIDENCIA, generar_guiones
 from src.prequalification_agent import procesar_mensaje_entrante
 
 RULES_PATH = Path(__file__).resolve().parent / "rules" / "rules.yaml"
@@ -720,7 +720,8 @@ with tab_inicio:
     n_escalar = sum(1 for d in decisiones if d["decision"] == "escalar_humano")
     n_ignorar = sum(1 for d in decisiones if d["decision"] == "ignorar")
     n_manejados = sum(1 for l in leads_vivo if l["stage"] != "Nuevo")
-    n_fuentes = len(_cargar_fuentes())
+    guiones_home = generar_guiones()
+    n_leads_clasificados = sum(g["n_leads"] for g in guiones_home)
 
     FLUJO = [
         (
@@ -740,8 +741,8 @@ with tab_inicio:
         ),
         (
             "D · Contenido", "D",
-            "Las preguntas y objeciones más repetidas de esos mismos leads alimentan guiones priorizados para nuevo contenido.",
-            f"3 guiones priorizados de {n_fuentes} fuentes de contenido",
+            "Los mensajes reales de esos mismos leads se clasifican en problemas recurrentes y alimentan guiones con evidencia citada, no una lista de objeciones inventada.",
+            f"3 guiones sobre los {n_leads_clasificados} leads reales clasificados (mín. {MINIMO_EVIDENCIA} de evidencia c/u)",
         ),
     ]
 
@@ -1191,6 +1192,14 @@ with tab_c:
         "teléfonos mal capturados, creadores sin asignar, fechas imposibles, duplicados.</p>",
         unsafe_allow_html=True,
     )
+    st.info(
+        "Este reporting corre sobre un **extracto fijo** (`data/leads.csv` + "
+        "`data/partner_enrollments.csv`), no sobre la base en vivo de las pestañas A/B — "
+        "así como en la agencia real el reporting corre sobre un export periódico del "
+        "partner, no sobre el CRM operativo. Por eso los leads que crees en 'Leads que "
+        "llegan' no van a aparecer aquí (ver DECISIONES.md).",
+        icon="ℹ️",
+    )
 
     uploaded = st.file_uploader(
         "Sube el CSV de inscripciones del partner (opcional — si no subes nada, se usa el dataset incluido)",
@@ -1362,18 +1371,45 @@ with tab_c:
 # ======================================================================= #
 with tab_d:
     st.markdown('<span class="eyebrow">Ejercicio D · 15%</span>', unsafe_allow_html=True)
-    st.header("Guiones que nacen de preguntas reales, no de la nada")
+    st.header("Guiones que nacen de los leads reales, no de una lista inventada")
     st.markdown(
-        '<p class="lede">Cada guion está atado a una fuente concreta y se prioriza por qué tan '
-        "frecuente y urgente es, no por capricho.</p>",
+        '<p class="lede">Los 3 problemas de abajo no son una lista de objeciones genéricas: salen '
+        "de clasificar los 42 mensajes reales de <code>data/leads.csv</code> (los mismos leads del "
+        "Ejercicio A/C) contra categorías editables en <code>rules.yaml</code>. Cada guion queda "
+        f"respaldado por al menos {MINIMO_EVIDENCIA} leads concretos, no por un número inventado.</p>",
         unsafe_allow_html=True,
     )
 
-    for g in generar_guiones(top_n=3):
+    guiones_d = generar_guiones()
+
+    for g in guiones_d:
+        badge_evidencia = (
+            f"{g['n_leads']} leads de evidencia"
+            if g["evidencia_suficiente"]
+            else f"⚠ solo {g['n_leads']} leads — por debajo del mínimo de {MINIMO_EVIDENCIA}"
+        )
         st.markdown(
             f"""<div class="script-card">
-            <div class="strip"><span>Fuente {g['fuente_id']}</span><span>score {g['prioridad_score']} · {g['duracion_estimada_seg']}s</span></div>
+            <div class="strip"><span>{g['problema']}</span><span>score {g['prioridad_score']} · {g['duracion_estimada_seg']}s</span></div>
             <div class="body">{g['guion']}</div>
             </div>""",
             unsafe_allow_html=True,
         )
+        st.caption(
+            f"{badge_evidencia} · {g['leads_con_senal_riesgo']} con señal de riesgo legal explícita "
+            f"({g['riesgo_pct']}%) · clasificado por las keywords: {', '.join(g['keywords']) if g['keywords'] else '(catch-all: el resto de los leads)'}"
+        )
+        with st.expander(f"📊 Ver informe y evidencia ({g['n_leads']} leads)"):
+            st.markdown(
+                f"**{g['n_leads']} de 42 leads reales** caen en esta categoría — "
+                f"**{g['leads_con_senal_riesgo']}** de ellos además mencionan una palabra de riesgo "
+                "legal (`escalar_keywords` en rules.yaml), lo que sube su prioridad: "
+                f"`score = n_leads × (1 + % riesgo) = {g['prioridad_score']}`."
+            )
+            st.dataframe(
+                pd.DataFrame(g["evidencia"]).rename(columns={
+                    "lead_id": "Lead", "mensaje": "Mensaje real", "estado_inicial": "Estado",
+                    "creador": "Creador", "canal": "Canal",
+                }),
+                use_container_width=True, hide_index=True,
+            )

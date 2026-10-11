@@ -38,6 +38,15 @@ fuera, y por qué:
   del motor es "Nuevo" (un lead recién llegado que nadie ha procesado
   todavía, que es un estado temporal, no una clasificación).
 
+- **El Ejercicio D dejó de usar `content_sources.json`.** La primera versión
+  generaba los 3 guiones a partir de un archivo de "fuentes de contenido"
+  con frecuencia/urgencia inventadas a mano. Se cambió a clasificar los 42
+  mensajes reales de `data/leads.csv` contra categorías editables en
+  `rules.yaml` (`categorias_contenido`), así cada guion queda respaldado
+  por leads concretos (mínimo 12 cada uno) en vez de un número que nadie
+  puede auditar. El archivo `content_sources.json` se conserva en el repo
+  (lo pide el enunciado original) pero ya no alimenta nada.
+
 - **Sin un LLM en vivo redactando los mensajes.** Lo evalué y decidí no
   conectar una API de IA generativa (tipo Claude/OpenAI) para los borradores
   de WhatsApp. En un contexto de compliance financiero duro (nunca prometer
