@@ -929,8 +929,10 @@ with tab_b:
         st.warning(f"SIM-NOPHONE: sin teléfono → queda en **{r.get('stage')}** y se le pidió el dato por WhatsApp.")
         st.rerun()
     if e3.button("Simular disposición inválida"):
-        r = crm_automation.aplicar_disposicion(leads[0]["lead_id"] if leads else "N/A", "Disposición Inventada")
-        st.error(f"Resultado: {r}")
+        leads_reales = [l for l in leads if not l["lead_id"].startswith("SIM-")]
+        lead_objetivo = leads_reales[0]["lead_id"] if leads_reales else (leads[0]["lead_id"] if leads else "N/A")
+        r = crm_automation.aplicar_disposicion(lead_objetivo, "Disposición Inventada")
+        st.error(f"{lead_objetivo}: {r}")
         st.rerun()
 
     st.markdown("#### Cola de fallos (dead-letter queue)")
@@ -960,28 +962,56 @@ with tab_b:
         )
 
         # ---- Una disposición inválida nunca se arregla sola reintentando
-        # el mismo valor — hace falta que un humano la corrija aquí ----
+        # el mismo valor — hace falta que un humano elija cuál quiere
+        # arreglar, vea el caso completo, y la corrija aquí ----
         invalidas_pendientes = [f for f in fallos if f["tipo"] == "disposicion_invalida" and f["status"] == "pending_retry"]
         if invalidas_pendientes:
             st.markdown("###### Corregir disposición inválida")
+            opciones_fallo = {}
             for f in invalidas_pendientes:
                 payload = json.loads(f["payload_json"]) if f["payload_json"] else {}
-                lead_id_fallo = payload.get("lead_id")
-                with st.form(f"form_fix_disp_{f['id']}"):
-                    st.caption(f"Lead {lead_id_fallo}: \"{payload.get('disposicion')}\" no es una disposición válida — elige la correcta.")
+                opciones_fallo[f'{payload.get("lead_id", "—")} — "{payload.get("disposicion")}"'] = f["id"]
+
+            etiqueta_sel = st.selectbox(
+                "Elige cuál fallo quieres arreglar", ["", *opciones_fallo.keys()], key="fallo_a_corregir",
+            )
+            if etiqueta_sel:
+                fallo_sel = next(f for f in invalidas_pendientes if f["id"] == opciones_fallo[etiqueta_sel])
+                payload_sel = json.loads(fallo_sel["payload_json"]) if fallo_sel["payload_json"] else {}
+                lead_sel = db.get_lead(payload_sel.get("lead_id"))
+
+                if not lead_sel:
+                    st.warning(f"El lead {payload_sel.get('lead_id')} ya no existe (¿se reinició el panel?).")
+                else:
+                    badge_sel = lead_sel["estado"]
+                    st.markdown(
+                        f"""<div class="lead-card">
+                        <h4>{lead_sel['lead_id']} <span class="badge {badge_sel}">{badge_sel.replace('_',' ')}</span></h4>
+                        <div class="meta">{lead_sel['creador']} · {lead_sel['canal']} · {lead_sel.get('telefono') or 'sin teléfono'} · llegó {lead_sel['timestamp']}</div>
+                        <div class="field-label">Mensaje</div>
+                        <div class="field-value">{lead_sel['mensaje']}</div>
+                        <div class="field-label">Etapa actual</div>
+                        <div class="field-value">{lead_sel['stage']}</div>
+                        <div class="field-label">Qué causó el error</div>
+                        <div class="field-value">Se intentó aplicar "{payload_sel.get('disposicion')}" — {fallo_sel['error']}</div>
+                        </div>""",
+                        unsafe_allow_html=True,
+                    )
+
+                with st.form(f"form_fix_disp_{fallo_sel['id']}"):
                     ncol1, ncol2 = st.columns([3, 2])
                     nueva_disp = ncol1.selectbox(
                         "Disposición correcta", ["", *crm_automation.STAGE_MAP.keys()],
-                        key=f"fix_disp_{f['id']}", label_visibility="collapsed",
+                        key=f"fix_disp_{fallo_sel['id']}", label_visibility="collapsed",
                     )
                     corregir = ncol2.form_submit_button("Corregir y aplicar", type="primary", use_container_width=True)
                 if corregir:
                     if not nueva_disp:
                         st.warning("Selecciona una disposición válida.")
-                    elif not lead_id_fallo:
+                    elif not payload_sel.get("lead_id"):
                         st.error("Este fallo no tiene un lead asociado para corregir.")
                     else:
-                        r = crm_automation.corregir_disposicion_invalida(f["id"], lead_id_fallo, nueva_disp)
+                        r = crm_automation.corregir_disposicion_invalida(fallo_sel["id"], payload_sel["lead_id"], nueva_disp)
                         if r["status"] == "ok":
                             st.success(f"Corregido → {r['stage']}.")
                         elif r["status"] == "borrador_pendiente":
