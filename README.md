@@ -92,9 +92,7 @@ $ streamlit run streamlit_app.py
   Local URL: http://localhost:8501
 ```
 
-Si ves esto en tu propia terminal, el backend está corriendo de verdad —
-nada de lo de arriba es texto inventado para el README, es la salida real
-de correr estos comandos sobre el repo tal como está.
+
 
 ## Otros documentos de entrega
 
