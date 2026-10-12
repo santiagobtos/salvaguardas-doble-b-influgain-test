@@ -661,6 +661,14 @@ def _contenido_modal_b(lead_id):
                 )
             else:
                 st.toast(f"Error ({r.get('motivo')}) → {lead_id} quedó en la cola de fallos.", icon="⚠️")
+            # Si la disposición cambió de etapa, el lead puede saltar de
+            # grupo (ej. "No manejadas" -> "Manejadas"). La tabla de origen
+            # se queda con esa misma fila marcada como seleccionada, y como
+            # ahora ahí aparece otro lead, el próximo rerun lo leería como
+            # "clic nuevo" y cambiaría el modal al lead equivocado. Forzar
+            # una key nueva en las 3 tablas (igual que al cerrar el modal)
+            # limpia esa selección pegada antes de que pase eso.
+            st.session_state["_tablas_b_version"] = st.session_state.get("_tablas_b_version", 0) + 1
             st.rerun(scope="fragment")
 
     audit_lead = [a for a in db.listar_audit_trail() if a["lead_id"] == lead_id]

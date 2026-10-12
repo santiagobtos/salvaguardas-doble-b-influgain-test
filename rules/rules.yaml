@@ -5,6 +5,7 @@
 # Si el mensaje contiene alguna de estas palabras, SIEMPRE se escala a un humano,
 # sin importar lo demás (riesgo legal, seguridad, o casos ambiguos).
 escalar_keywords:
+  - "jurisprudencia"
   - "demanda"
   - "abogado"
   - "embargo"
