@@ -1,45 +1,21 @@
 # Decisiones — qué no se construyó a propósito
 
-Esta prueba se puede expandir casi sin límite. Esto es lo que decidí dejar
-fuera — separado entre lo que el enunciado excluye directamente y lo que
-quedó fuera por las circunstancias de hacerlo en 72 horas, solo.
+Esta prueba la puedo seguir ampliando casi sin límite, así que acá dejo claro qué decidí no meter y por qué. Separo entre lo que el mismo enunciado no deja hacer, y lo que quedó por fuera simplemente por las 72 horas y por estar yo solo con esto.
 
-## Por el alcance de la prueba (el enunciado lo prohíbe o lo pide así)
+## Por el alcance de la prueba
 
-- **Sin integración real de WhatsApp/Meta.** Regla dura del enunciado: no
-  tocar WhatsApp Business real. Las "plantillas de WhatsApp" quedan como
-  borradores en texto en SQLite, nunca se envían.
+**WhatsApp o Meta real.** Esto ni se me ocurrió tocarlo, porque el enunciado es tajante en que no se puede meter mano a WhatsApp Business real. Entonces lo que armé son borradores de texto que se quedan guardados en SQLite, nunca llegan a salir de ahí.
 
-- **Sin motor de scoring de crédito ni tasas.** El enunciado prohíbe
-  inventar tasas o puntajes. El sistema solo pre-califica por monto/tipo
-  de deuda/interés expresado — nunca "aprueba" nada.
+**Un motor que invente tasas o puntajes de crédito.** Tampoco, porque la prueba lo prohíbe directamente. Lo único que hace el sistema es pre-calificar mirando el monto que mencionó el lead, el tipo de deuda y si mostró interés en hablar con un Consejero — en ningún momento le pone un número a nada ni "aprueba" algo.
 
-- **El reporting (Ejercicio C) lee CSV fijos, no la base SQLite en vivo.**
-  El enunciado pide reportar sobre "leads + CSV sucio" como insumo
-  separado, no sobre el estado transaccional del CRM corriendo en la
-  demo — son dos cosas distintas a propósito.
+**Que el reporting lea la base en vivo del CRM.** Esto lo dejé así a propósito: el enunciado pide que se reporte sobre "leads + CSV sucio" como algo aparte, no sobre lo que está pasando en ese momento en el CRM. Son dos cosas que decidí mantener separadas.
 
-## Por las circunstancias (72h, un solo desarrollador, prioridades)
+## Por las circunstancias (72h, solo yo)
 
-- **Sin una bandeja única con todos los borradores pendientes.** Sí hay
-  revisión real (pestaña B: editar/Aprobar/Descartar por lead antes de
-  que "salga"), pero es por lead, no una lista global de todo lo
-  `pending_review`. No alcanzó a ser prioridad frente al resto del flujo.
+**Una bandeja única con todos los borradores pendientes.** Esto sí me quedó debiendo. Lo que sí hay es revisión real por cada lead — en la pestaña B uno abre el lead, edita el borrador si quiere, y lo aprueba o lo descarta antes de que salga — pero no alcancé a armar una vista donde se vean de una todos los que están pendientes en un solo lugar. Con todo lo demás que había que sacar adelante, esto no quedó como prioridad.
 
-- **Sin autenticación ni multiusuario.** Demo de un solo operador; cada
-  acción queda como `"sistema"` en el `audit_trail` (el campo ya existe,
-  falta la capa de login). Construir auth real no aporta nada a lo que
-  esta prueba mide.
+**Autenticación o manejo de varios usuarios.** No lo armé porque esto es una demo pensada para un solo operador. Cada acción queda registrada como `"sistema"` en el audit trail — el campo para meter un actor real ya está ahí, solo falta la capa de login encima — y honestamente, meter autenticación de verdad no le suma nada a lo que esta prueba está midiendo.
 
-- **Reintentos de la cola de fallos son manuales**
-  (`POST /crm/failed-queue/retry`), no un worker con scheduler. Se
-  prefirió así para que la demo fuera reproducible en un solo comando sin
-  depender de un proceso en segundo plano (ver `NOTA_ESCALA.md`).
+**Que los reintentos de la cola de fallos fueran automáticos.** Los dejé manuales, con un botón que llama a `/crm/failed-queue/retry`, en vez de un worker corriendo solo con su propio scheduler. Lo hice así para que toda la demo se pudiera reproducir con un solo comando, sin depender de que algo esté corriendo aparte en segundo plano (el detalle completo está en `NOTA_ESCALA.md`).
 
-- **Sin un LLM en vivo redactando los mensajes.** Fue el riesgo técnico
-  más grande a evaluar: en compliance financiero duro (nunca prometer
-  ahorro, nunca decir "asesor", nunca inventar tasas) un LLM sin
-  guardrails puede alucinar y romper justo esas reglas, y 72h no alcanzan
-  para probarlo a fondo. Las plantillas deterministas de
-  `crm_automation` sí incorporan lo que el lead escribió de verdad (tipo
-  de deuda, monto) sin ese riesgo.
+**Meter un LLM en vivo para redactar los mensajes.** Esto lo pensé harto y al final decidí no hacerlo. Estamos hablando de compliance financiero bien estricto — nunca prometer un ahorro, nunca llamar "asesor" a nadie, nunca inventarse una tasa — y un LLM sin guardrails bien probados se puede mandar a alucinar justo ahí, en lo que más importa no romper. Y 72 horas no me alcanzaban para probar eso a fondo como para confiar en él. Por eso terminé usando las plantillas deterministas de `crm_automation`: nunca se salen de las reglas de compliance, y aun así sí usan lo que el lead escribió de verdad (tipo de deuda, monto).
